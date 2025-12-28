@@ -47,14 +47,17 @@ public class HistoricoServlet extends HttpServlet {
     
     private void showNewForm(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         request.setAttribute("listaAnimais", AnimalDAO.getAll());
-        // Types would be Consulta or Vacinacao
+        String idAnimal = request.getParameter("idAnimal");
+        if (idAnimal != null) {
+            request.setAttribute("selectedAnimalId", Integer.parseInt(idAnimal));
+        }
         request.getRequestDispatcher("historico/novo.jsp").forward(request, response);
     }
 
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         String tipo = request.getParameter("TipoDiscriminador");
-        
-        PrestacaoServico ps;
+        PrestacaoServico ps = null;
+        int servicoId = 1; // Default
         if ("Consulta".equals(tipo)) {
             Consulta c = new Consulta();
             c.setMotivo(request.getParameter("Motivo"));
@@ -62,6 +65,7 @@ public class HistoricoServlet extends HttpServlet {
             c.setDiagnostico(request.getParameter("Diagnostico"));
             c.setMedicacaoPrescrita(request.getParameter("MedicacaoPrescrita"));
             ps = c;
+            servicoId = 1;
         } else if ("ExameFisico".equals(tipo)) {
             ExameFisico ef = new ExameFisico();
             ef.setTemperatura(new java.math.BigDecimal(request.getParameter("Temperatura")));
@@ -69,38 +73,46 @@ public class HistoricoServlet extends HttpServlet {
             ef.setFrequenciaCardiaca(Integer.parseInt(request.getParameter("FrequenciaCardiaca")));
             ef.setFrequenciaRespiratoria(Integer.parseInt(request.getParameter("FrequenciaRespiratoria")));
             ps = ef;
+            servicoId = 4;
         } else if ("ResultadoExame".equals(tipo)) {
             ResultadoExame re = new ResultadoExame();
             re.setTipoExame(request.getParameter("TipoExame"));
             re.setResultadoDetalhado(request.getParameter("ResultadoDetalhado"));
             ps = re;
+            servicoId = 5;
         } else if ("Desparasitacao".equals(tipo)) {
             Desparasitacao d = new Desparasitacao();
             d.setTipo(request.getParameter("Tipo"));
             d.setProdutosUtilizados(request.getParameter("ProdutosUtilizados"));
             ps = d;
+            servicoId = 6;
         } else if ("Cirurgia".equals(tipo)) {
             Cirurgia c = new Cirurgia();
             c.setTipoCirurgia(request.getParameter("TipoCirurgia"));
             c.setNotasPosOperatorias(request.getParameter("NotasPosOperatorias"));
             ps = c;
+            servicoId = 3;
         } else if ("TratamentoTerapeutico".equals(tipo)) {
             TratamentoTerapeutico tt = new TratamentoTerapeutico();
             tt.setDescricao(request.getParameter("Descricao"));
             ps = tt;
+            servicoId = 7;
         } else {
             Vacinacao v = new Vacinacao();
             v.setTipoVacina(request.getParameter("TipoVacina"));
             v.setFabricante(request.getParameter("Fabricante"));
             ps = v;
+            servicoId = 2;
         }
         
         ps.setDetalhesGerais(request.getParameter("DetalhesGerais"));
-        ps.setAnimalId(Integer.parseInt(request.getParameter("Animal_IDAnimal")));
-        ps.setTipoServicoId(1); // Placeholder or from form
+        String animalIdStr = request.getParameter("Animal_IDAnimal");
+        int animalId = Integer.parseInt(animalIdStr);
+        ps.setAnimalId(animalId);
+        ps.setTipoServicoId(servicoId); 
         ps.setDataHora(new Timestamp(System.currentTimeMillis()));
         
         HistoricoDAO.save(ps);
-        response.sendRedirect("animais"); // Return to animal list
+        response.sendRedirect("historico?idAnimal=" + animalId); 
     }
 }

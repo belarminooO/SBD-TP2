@@ -13,6 +13,11 @@ public class ClienteDAO {
     public static int save(Cliente c) {
         if (c == null || !c.valid()) return -1;
         
+        // Check if exists to decide between save/update
+        if (getByNif(c.getNif()) != null) {
+            return update(c);
+        }
+
         Connection con = null;
         PreparedStatement ps = null;
         int nRows = 0;
@@ -54,6 +59,48 @@ public class ClienteDAO {
             con.commit(); // Commit transaction
         } catch (SQLException e) {
             System.err.println("Erro ao gravar Cliente: " + e.getMessage());
+            try { if (con != null) con.rollback(); } catch(SQLException ex) { ex.printStackTrace(); }
+            return -1;
+        } finally {
+            Configura.close(con);
+        }
+        return nRows;
+    }
+
+    public static int update(Cliente c) {
+        if (c == null || !c.valid()) return -1;
+        
+        Connection con = null;
+        PreparedStatement ps = null;
+        int nRows = 0;
+        
+        try {
+            con = new Configura().getConnection(false);
+            
+            String sqlCliente = "UPDATE Cliente SET NomeCompleto=?, Contactos=?, Morada=?, Distrito=?, Concelho=?, Freguesia=?, PreferenciasLinguisticas=? WHERE NIF=?";
+            ps = con.prepareStatement(sqlCliente);
+            ps.setString(1, c.getNomeCompleto());
+            ps.setString(2, c.getContactos());
+            ps.setString(3, c.getMorada());
+            ps.setString(4, c.getDistrito());
+            ps.setString(5, c.getConcelho());
+            ps.setString(6, c.getFreguesia());
+            ps.setString(7, c.getPreferenciasLinguisticas());
+            ps.setString(8, c.getNif());
+            nRows = ps.executeUpdate();
+            ps.close();
+
+            if (c instanceof ClienteEmpresa) {
+                String sqlEmpresa = "UPDATE ClienteEmpresa SET CapitalSocial=? WHERE NIF=?";
+                ps = con.prepareStatement(sqlEmpresa);
+                ps.setBigDecimal(1, ((ClienteEmpresa)c).getCapitalSocial());
+                ps.setString(2, c.getNif());
+                ps.executeUpdate();
+            }
+            
+            con.commit();
+        } catch (SQLException e) {
+            System.err.println("Erro ao atualizar Cliente: " + e.getMessage());
             try { if (con != null) con.rollback(); } catch(SQLException ex) { ex.printStackTrace(); }
             return -1;
         } finally {

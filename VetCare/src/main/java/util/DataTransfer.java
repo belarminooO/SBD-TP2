@@ -64,6 +64,10 @@ import com.itextpdf.layout.properties.TextAlignment;
  * (SQL, CSV, XML, JSON, HTML, TXT/Consola).
  */
 public final class DataTransfer {
+
+    private static class ImportedRecord extends PrestacaoServico {
+        public ImportedRecord() { super(); }
+    }
 	
 	// ----------------------------------------------------------------------
     // CONSTANTES E CONFIGURAÇÃO DE CAMINHOS
@@ -1670,6 +1674,13 @@ public final class DataTransfer {
         writer.println("    <nascimento>" + a.getDataNascimento() + "</nascimento>");
         writer.println("    <filiacao>" + escapeXml(a.getFiliacao()) + "</filiacao>");
         writer.println("    <transponder>" + escapeXml(a.getNumeroTransponder()) + "</transponder>");
+        writer.println("    <alergias>" + escapeXml(a.getAlergias()) + "</alergias>");
+        writer.println("    <cores>" + escapeXml(a.getCores()) + "</cores>");
+        writer.println("    <peso>" + a.getPesoAtual() + "</peso>");
+        writer.println("    <estado_reprodutivo>" + escapeXml(a.getEstadoReprodutivo()) + "</estado_reprodutivo>");
+        writer.println("    <caracteristicas>" + escapeXml(a.getCaracteristicasDistintivas()) + "</caracteristicas>");
+        writer.println("    <catalogo>" + escapeXml(a.getCatalogoNomeComum()) + "</catalogo>");
+        writer.println("    <tutor_nif>" + escapeXml(a.getClienteNif()) + "</tutor_nif>");
         writer.println("  </info>");
         
         // Clinical History
@@ -1722,9 +1733,16 @@ public final class DataTransfer {
             info.put("nome", a.getNome());
             info.put("raca", a.getRaca());
             info.put("sexo", a.getSexo());
-            info.put("nascimento", a.getDataNascimento());
+            info.put("nascimento", a.getDataNascimento() != null ? a.getDataNascimento().toString() : "");
             info.put("filiacao", a.getFiliacao());
             info.put("transponder", a.getNumeroTransponder());
+            info.put("alergias", a.getAlergias());
+            info.put("cores", a.getCores());
+            info.put("peso", a.getPesoAtual());
+            info.put("estado_reprodutivo", a.getEstadoReprodutivo());
+            info.put("caracteristicas", a.getCaracteristicasDistintivas());
+            info.put("catalogo", a.getCatalogoNomeComum());
+            info.put("tutor_nif", a.getClienteNif());
             root.put("info", info);
 
             JSONArray history = new JSONArray();
@@ -1761,40 +1779,52 @@ public final class DataTransfer {
             Document doc = builder.parse(is);
             doc.getDocumentElement().normalize();
 
-            // 1. Get Animal Info
             Node infoNode = doc.getElementsByTagName("info").item(0);
             if (infoNode == null) return false;
             Element infoElem = (Element) infoNode;
-            String transponder = infoElem.getElementsByTagName("transponder").item(0).getTextContent();
             
-            // Check if animal exists
-            int animalId = -1;
-            String sqlCheck = "SELECT IDAnimal FROM Animal WHERE NumeroTransponder = ?";
-            try (Connection con = new Configura().getConnection();
-                 PreparedStatement ps = con.prepareStatement(sqlCheck)) {
-                ps.setString(1, transponder);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) animalId = rs.getInt(1);
-                }
+            String transponder = getTagValue("transponder", infoElem);
+            if (transponder == null) return false;
+
+            // 1. Process Animal
+            Animal a = AnimalDAO.getByTransponder(transponder);
+            boolean isNew = (a == null);
+            if (isNew) {
+                a = new Animal();
+                a.setNumeroTransponder(transponder);
+            }
+            
+            a.setNome(getTagValue("nome", infoElem));
+            a.setRaca(getTagValue("raca", infoElem));
+            a.setSexo(getTagValue("sexo", infoElem));
+            a.setDataNascimento(DataFormatter.StringToSqlDate(getTagValue("nascimento", infoElem)));
+            // ... set other fields
+            a.setFiliacao(getTagValue("filiacao", infoElem));
+            a.setCatalogoNomeComum(getTagValue("catalogo", infoElem));
+            a.setClienteNif(getTagValue("tutor_nif", infoElem));
+            
+            int animalId;
+            if (isNew) {
+                animalId = AnimalDAO.save(a);
+            } else {
+                AnimalDAO.update(a);
+                animalId = a.getIdAnimal();
             }
 
-            if (animalId == -1) {
-                // Should we create it? In a real scenario, yes. 
-                // For now, let's assume it must exist or we need more info (tutor NIF, etc.)
-                System.err.println("Animal com transponder " + transponder + " não encontrado para importação de histórico.");
-                return false;
-            }
-
-            // 2. Get History
+            // 2. Process History Records
             NodeList historyList = doc.getElementsByTagName("record");
             for (int i = 0; i < historyList.getLength(); i++) {
-                Node record = historyList.item(i);
-                if (record.getNodeType() == Node.ELEMENT_NODE) {
-                    Element elem = (Element) record;
-                    // Extract fields from XML (based on view column names)
-                    // ... This is complex because the view doesn't have all sub-table fields.
-                    // The Req 4.3 says "ficha e histórico clínicos". 
-                    // To be fully functional, the export should have all fields from subtypes.
+                Node recordNode = historyList.item(i);
+                if (recordNode.getNodeType() == Node.ELEMENT_NODE) {
+                    Element recordElem = (Element) recordNode;
+                    ImportedRecord ps = new ImportedRecord();
+                    ps.setAnimalId(animalId);
+                    ps.setTipoDiscriminador(getTagValue("tipo", recordElem));
+                    ps.setDataHora(java.sql.Timestamp.valueOf(getTagValue("datahora", recordElem).replace("T", " ")));
+                    ps.setDetalhesGerais(getTagValue("detalhes", recordElem));
+                    ps.setTipoServicoId(1); // Default to Consulta if unknown
+                    
+                    HistoricoDAO.save(ps);
                 }
             }
             return true;
@@ -1802,6 +1832,53 @@ public final class DataTransfer {
             e.printStackTrace();
             return false;
         }
+    }
+
+    public static boolean importAnimalFullProfileJson(String jsonStr) {
+        try {
+            JSONObject root = new JSONObject(jsonStr);
+            JSONObject info = root.getJSONObject("info");
+            String transponder = info.getString("transponder");
+
+            Animal a = AnimalDAO.getByTransponder(transponder);
+            boolean isNew = (a == null);
+            if (isNew) { a = new Animal(); a.setNumeroTransponder(transponder); }
+            
+            a.setNome(info.optString("nome"));
+            a.setRaca(info.optString("raca"));
+            a.setSexo(info.optString("sexo"));
+            a.setDataNascimento(DataFormatter.StringToSqlDate(info.optString("nascimento")));
+            a.setCatalogoNomeComum(info.optString("catalogo"));
+            a.setClienteNif(info.optString("tutor_nif"));
+            
+            int animalId;
+            if (isNew) animalId = AnimalDAO.save(a); else { AnimalDAO.update(a); animalId = a.getIdAnimal(); }
+
+            JSONArray history = root.getJSONArray("history");
+            for (int i = 0; i < history.length(); i++) {
+                JSONObject rec = history.getJSONObject(i);
+                ImportedRecord ps = new ImportedRecord();
+                ps.setAnimalId(animalId);
+                ps.setTipoDiscriminador(rec.optString("tipo", "Consulta"));
+                String dh = rec.optString("datahora");
+                if (dh != null) ps.setDataHora(java.sql.Timestamp.valueOf(dh.replace("T", " ")));
+                ps.setDetalhesGerais(rec.optString("detalhes"));
+                ps.setTipoServicoId(1);
+                HistoricoDAO.save(ps);
+            }
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private static String getTagValue(String tag, Element elem) {
+        NodeList nl = elem.getElementsByTagName(tag);
+        if (nl != null && nl.getLength() > 0) {
+            return nl.item(0).getTextContent();
+        }
+        return null;
     }
 }
 

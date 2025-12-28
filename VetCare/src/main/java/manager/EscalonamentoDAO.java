@@ -26,20 +26,49 @@
 
         public static int atribuir(int idHorario, int idServico, String nLicenca) {
             // Req 4.2: No overlap constraint
-            // Check if this vet is already supervising another service at this same time (idHorario)
-            String sqlCheck = "SELECT COUNT(*) FROM Escalonamento WHERE IDHorario = ? AND NLicenca = ? AND IDServico <> ?";
+            // Fetch target horario details
+            String sqlTarget = "SELECT DiaSemana, HoraInicio, HoraFim FROM Horario WHERE IDHorario = ?";
+            String diaTarget = "";
+            java.sql.Time inicioTarget = null;
+            java.sql.Time fimTarget = null;
+            
+            try (Connection con = new Configura().getConnection();
+                 PreparedStatement ps = con.prepareStatement(sqlTarget)) {
+                ps.setInt(1, idHorario);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        diaTarget = rs.getString("DiaSemana");
+                        inicioTarget = rs.getTime("HoraInicio");
+                        fimTarget = rs.getTime("HoraFim");
+                    }
+                }
+            } catch (SQLException e) { return -1; }
+
+            // Check if vet is already scaled for any overlapping period on the same day
+            String sqlCheck = "SELECT COUNT(*) FROM Escalonamento e " +
+                             "JOIN Horario h ON e.IDHorario = h.IDHorario " +
+                             "WHERE e.NLicenca = ? AND h.DiaSemana = ? " +
+                             "AND (h.HoraInicio < ? AND h.HoraFim > ?) " +
+                             "AND (e.IDHorario <> ? OR e.IDServico <> ?)";
+            
             try (Connection con = new Configura().getConnection();
                 PreparedStatement ps = con.prepareStatement(sqlCheck)) {
-                ps.setInt(1, idHorario);
-                ps.setString(2, nLicenca);
-                ps.setInt(3, idServico);
+                ps.setString(1, nLicenca);
+                ps.setString(2, diaTarget);
+                ps.setTime(3, fimTarget);
+                ps.setTime(4, inicioTarget);
+                ps.setInt(5, idHorario);
+                ps.setInt(6, idServico);
+                
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next() && rs.getInt(1) > 0) {
-                        System.err.println("Erro: Veterinário já tem supervisão noutro serviço neste horário.");
+                        System.err.println("Erro: Veterinário já tem supervisão num período sobreposto.");
                         return -2; // Overlap error
                     }
                 }
-            } catch (SQLException e) {}
+            } catch (SQLException e) {
+                System.err.println("Erro ao validar sobreposição: " + e.getMessage());
+            }
 
             String sqlDel = "DELETE FROM Escalonamento WHERE IDHorario=? AND IDServico=?";
             try (Connection con = new Configura().getConnection();

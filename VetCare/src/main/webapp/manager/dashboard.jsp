@@ -16,11 +16,18 @@
             <nav>
                 <a href="${pageContext.request.contextPath}/" class="nav-link">Home</a>
                 <a href="${pageContext.request.contextPath}/manager" class="nav-link">Dashboard</a>
+                <a href="${pageContext.request.contextPath}/manager?p=horarios" class="nav-link">Gerir Escalas</a>
             </nav>
         </div>
     </div>
 
     <div class="container">
+        
+        <div class="card" style="background: #eef2ff; border-left: 5px solid #4f46e5;">
+            <h3>4.2 Gestão de Escalonamento</h3>
+            <p>Atribua veterinários aos horários de funcionamento e serviços da clínica.</p>
+            <a href="${pageContext.request.contextPath}/manager?p=horarios" class="btn btn-primary">Ir para Gestão de Escalas</a>
+        </div>
         
         <div class="card">
             <h3>4.5 Animais com Expetativa de Vida Excedida</h3>
@@ -51,10 +58,51 @@
             <% } %>
             </ul>
         </div>
+
+        <div class="card" style="border-left: 5px solid #6366f1;">
+            <h3>4.3 Exportar Perfil de Animal (XML/JSON)</h3>
+            <p style="font-size: 0.9rem; color: #666;">Selecione um animal para exportar a sua ficha e histórico clínico completo.</p>
+            <form action="manager" method="get" style="display:flex; gap:10px; align-items:flex-end;">
+                <input type="hidden" name="p" value="xml">
+                <div style="flex:1;">
+                    <label>Animal:</label>
+                    <select name="id" required style="width:100%; padding: 5px; border-radius: 4px; border: 1px solid #ddd;">
+                        <% List<Animal> animalsForExport = animal.AnimalDAO.getAll();
+                           if(animalsForExport!=null) for(Animal a : animalsForExport) { %>
+                           <option value="<%= a.getIdAnimal() %>"><%= a.getNome() %> (Tutor NIF: <%= a.getClienteNif() %>)</option>
+                        <% } %>
+                    </select>
+                </div>
+                <button type="submit" name="p" value="xml" class="btn btn-secondary">Exportar XML</button>
+                <button type="submit" name="p" value="json" class="btn btn-secondary">Exportar JSON</button>
+            </form>
+        </div>
         
         <div class="card">
+            <h3>4.4 Importar Perfil de Animal (XML/JSON)</h3>
+            <p style="font-size: 0.9rem; color: #666;">Cole o conteúdo do documento para importar a ficha e o histórico clínico.</p>
+            <form action="manager" method="get">
+                <input type="hidden" name="p" value="import">
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <label>Conteúdo XML:</label>
+                        <textarea name="xmlData" style="width:100%; height:80px;" placeholder="Cole o XML aqui..."></textarea>
+                    </div>
+                    <div style="flex:1;">
+                        <label>Conteúdo JSON:</label>
+                        <textarea name="jsonData" style="width:100%; height:80px;" placeholder="Cole o JSON aqui..."></textarea>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-secondary" style="margin-top:10px;">Importar Dados</button>
+            </form>
+            <% String msg = request.getParameter("msg"); if(msg!=null){ %>
+                <div style="margin-top:10px; padding:10px; background:#d4edda; color:#155724; border-radius:4px;"><%= msg %></div>
+            <% } %>
+        </div>
+
+        <div class="card">
             <h3>4.8 Agenda Próxima Semana</h3>
-             <ul>
+            <ul>
             <% Map<String, Integer> agenda = (Map<String, Integer>) request.getAttribute("agendaSemana");
                if(agenda!=null) for(Map.Entry<String,Integer> e : agenda.entrySet()) { %>
                <li><%= e.getKey() %>: <%= e.getValue() %> agendamentos</li>

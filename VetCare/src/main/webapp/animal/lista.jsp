@@ -52,7 +52,7 @@
                     <tr>
                         <th>Nome</th>
                         <th>Espécie</th>
-                        <th>Raça</th>
+                        <th>Idade / Escalão</th>
                         <th>Tutor (NIF)</th>
                         <th>Ações</th>
                     </tr>
@@ -66,7 +66,10 @@
                     <tr>
                         <td><%= a.getNome() %></td>
                         <td><%= a.getCatalogoNomeComum() %></td>
-                        <td><%= a.getRaca() %></td>
+                        <td>
+                            <%= a.getIdadeFormatada() %><br>
+                            <span class="badge" style="background: #e9ecef; color: #495057;"><%= a.getEscalaoEtario(a.getExpectativaVida()) %></span>
+                        </td>
                         <td><%= a.getClienteNif() %></td>
                         <td>
                             <a href="animais?p=edit&id=<%= a.getIdAnimal() %>" class="btn btn-sm">Editar</a>

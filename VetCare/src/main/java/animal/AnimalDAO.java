@@ -13,6 +13,11 @@ public class AnimalDAO {
     public static int save(Animal a) {
         if (a == null || !a.valid()) return -1;
         
+        // If ID exists, it's an update
+        if (a.getIdAnimal() != null && a.getIdAnimal() > 0) {
+            return update(a);
+        }
+
         String sql = "INSERT INTO Animal (Nome, Raca, Sexo, DataNascimento, Filiacao, EstadoReprodutivo, Alergias, Cores, PesoAtual, CaracteristicasDistintivas, NumeroTransponder, Fotografia, Cliente_NIF, Catalogo_NomeComum) " +
                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         
@@ -41,9 +46,42 @@ public class AnimalDAO {
         return -1;
     }
 
+    public static int update(Animal a) {
+        if (a == null || !a.valid()) return -1;
+        
+        String sql = "UPDATE Animal SET Nome=?, Raca=?, Sexo=?, DataNascimento=?, Filiacao=?, EstadoReprodutivo=?, Alergias=?, Cores=?, PesoAtual=?, CaracteristicasDistintivas=?, NumeroTransponder=?, Fotografia=?, Cliente_NIF=?, Catalogo_NomeComum=? WHERE IDAnimal=?";
+        
+        try (Connection con = new Configura().getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            
+            ps.setString(1, a.getNome());
+            ps.setString(2, a.getRaca());
+            ps.setString(3, a.getSexo());
+            ps.setDate(4, a.getDataNascimento());
+            ps.setString(5, a.getFiliacao());
+            ps.setString(6, a.getEstadoReprodutivo());
+            ps.setString(7, a.getAlergias());
+            ps.setString(8, a.getCores());
+            ps.setBigDecimal(9, a.getPesoAtual());
+            ps.setString(10, a.getCaracteristicasDistintivas());
+            ps.setString(11, a.getNumeroTransponder());
+            ps.setString(12, a.getFotografia());
+            ps.setString(13, a.getClienteNif());
+            ps.setString(14, a.getCatalogoNomeComum());
+            ps.setInt(15, a.getIdAnimal());
+            
+            return ps.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Erro ao atualizar Animal: " + e.getMessage());
+        }
+        return -1;
+    }
+
     public static List<Animal> getAll() {
         List<Animal> list = new ArrayList<>();
-        String sql = "SELECT * FROM Animal ORDER BY Nome";
+        String sql = "SELECT a.*, c.ExpectativaVida FROM Animal a " +
+                     "LEFT JOIN Catalogo c ON a.Catalogo_NomeComum = c.NomeComum " +
+                     "ORDER BY a.Nome";
         try (Connection con = new Configura().getConnection();
              PreparedStatement ps = con.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -88,7 +126,10 @@ public class AnimalDAO {
 
     public static List<Animal> searchByTutor(String tutorName) {
         List<Animal> list = new ArrayList<>();
-        String sql = "SELECT a.* FROM Animal a JOIN Cliente c ON a.Cliente_NIF = c.NIF WHERE c.NomeCompleto LIKE ? ORDER BY a.Nome";
+        String sql = "SELECT a.*, cat.ExpectativaVida FROM Animal a " +
+                     "JOIN Cliente c ON a.Cliente_NIF = c.NIF " +
+                     "LEFT JOIN Catalogo cat ON a.Catalogo_NomeComum = cat.NomeComum " +
+                     "WHERE c.NomeCompleto LIKE ? ORDER BY a.Nome";
         try (Connection con = new Configura().getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, "%" + tutorName + "%");
@@ -99,5 +140,21 @@ public class AnimalDAO {
             System.err.println("Erro ao pesquisar animais: " + e.getMessage());
         }
         return list;
+    }
+    
+    public static Animal getByTransponder(String transponder) {
+        String sql = "SELECT a.*, c.ExpectativaVida FROM Animal a " +
+                     "JOIN Catalogo c ON a.Catalogo_NomeComum = c.NomeComum " +
+                     "WHERE a.NumeroTransponder = ?";
+        try (Connection con = new Configura().getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, transponder);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return new Animal(rs);
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro ao ler Animal por transponder: " + e.getMessage());
+        }
+        return null;
     }
 }
