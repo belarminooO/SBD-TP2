@@ -1,42 +1,61 @@
 package historico;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.Statement;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import util.Configura;
 
+/**
+ * Responsável pela persistência e gestão dos dados do histórico clínico.
+ * Implementa o padrão Table-Per-Type (TPT), gerindo a inserção atómica de dados
+ * na tabela base e nas respetivas tabelas satélite através de transações.
+ */
 public class HistoricoDAO {
 
+    /**
+     * Persiste um registo de prestação de serviço de forma polimórfica.
+     * O processo envolve a inserção na tabela base PrestacaoServico, a recuperação
+     * do identificador gerado e a inserção subsequente na tabela específica
+     * correspondente ao subtipo.
+     * 
+     * @param ps Objeto que representa a prestação de serviço.
+     * @return O identificador da prestação gerada ou -1 em caso de falha.
+     */
     public static int save(PrestacaoServico ps) {
         Connection con = null;
         int idGerado = -1;
-        
+
         try {
             con = new Configura().getConnection(false);
-            
-            // 1. Insert Supertype
+
             String sqlBase = "INSERT INTO PrestacaoServico (DataHora, DetalhesGerais, TipoDiscriminador, Animal_IDAnimal, Agendamento_IDAgendamento, TipoServico_IDServico) VALUES (?, ?, ?, ?, ?, ?)";
+
             PreparedStatement pstmt = con.prepareStatement(sqlBase, Statement.RETURN_GENERATED_KEYS);
             pstmt.setTimestamp(1, ps.getDataHora());
             pstmt.setString(2, ps.getDetalhesGerais());
             pstmt.setString(3, ps.getTipoDiscriminador());
             pstmt.setInt(4, ps.getAnimalId());
-            if(ps.getAgendamentoId()!=null) pstmt.setInt(5, ps.getAgendamentoId()); else pstmt.setNull(5, java.sql.Types.INTEGER);
+
+            if (ps.getAgendamentoId() != null) {
+                pstmt.setInt(5, ps.getAgendamentoId());
+            } else {
+                pstmt.setNull(5, java.sql.Types.INTEGER);
+            }
+
             pstmt.setInt(6, ps.getTipoServicoId());
-            
             pstmt.executeUpdate();
-            
+
             ResultSet rs = pstmt.getGeneratedKeys();
-            if (rs.next()) idGerado = rs.getInt(1);
+            if (rs.next()) {
+                idGerado = rs.getInt(1);
+            }
             pstmt.close();
-            
-            if (idGerado == -1) { con.rollback(); return -1; }
-            
-            // 2. Insert Subtype
+
+            if (idGerado == -1) {
+                con.rollback();
+                return -1;
+            }
+
             if (ps instanceof Consulta) {
                 Consulta c = (Consulta) ps;
                 String sqlSub = "INSERT INTO Consulta (IDPrestacao, Motivo, Sintomas, Diagnostico, MedicacaoPrescrita) VALUES (?, ?, ?, ?, ?)";
@@ -97,11 +116,16 @@ public class HistoricoDAO {
                 pstmt.setString(2, tt.getDescricao());
                 pstmt.executeUpdate();
             }
-            
+
             con.commit();
         } catch (SQLException e) {
-            System.err.println("Erro ao gravar historico: " + e.getMessage());
-            try { if(con!=null) con.rollback(); } catch(SQLException ex) {}
+            System.err.println("Erro ao gravar histórico clínico: " + e.getMessage());
+            try {
+                if (con != null)
+                    con.rollback();
+            } catch (SQLException ex) {
+                // Erro ao reverter transação ignorado conscientemente
+            }
             return -1;
         } finally {
             Configura.close(con);
@@ -109,16 +133,25 @@ public class HistoricoDAO {
         return idGerado;
     }
 
+    /**
+     * Recupera a lista completa do histórico clínico de um animal específico.
+     * Utiliza uma vista SQL que consolida dados polimórficos de forma eficiente,
+     * transformando cada registo num mapa de pares chave-valor.
+     * 
+     * @param animalId Identificador único do animal.
+     * @return Lista de mapas contendo os dados do histórico.
+     */
     public static List<java.util.Map<String, Object>> getHistoryByAnimal(int animalId) {
         List<java.util.Map<String, Object>> list = new ArrayList<>();
         String sql = "SELECT * FROM HistoricoClinico WHERE IDAnimal = ? ORDER BY DataHora DESC";
-        
+
         try (Connection con = new Configura().getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
+                PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, animalId);
             try (ResultSet rs = ps.executeQuery()) {
                 java.sql.ResultSetMetaData meta = rs.getMetaData();
                 int columnCount = meta.getColumnCount();
+
                 while (rs.next()) {
                     java.util.Map<String, Object> row = new java.util.HashMap<>();
                     for (int i = 1; i <= columnCount; i++) {
@@ -128,9 +161,8 @@ public class HistoricoDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Erro ao ler historico por animal: " + e.getMessage());
+            System.err.println("Erro ao ler histórico clínico: " + e.getMessage());
         }
         return list;
     }
-
 }

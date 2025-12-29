@@ -15,13 +15,29 @@ import animal.AnimalDAO;
 import agendamento.Agendamento;
 import agendamento.AgendamentoDAO;
 
+/**
+ * Controlador responsável pela gestão do histórico clínico dos animais.
+ * Gere os fluxos de visualização da linha do tempo e a inserção de novos
+ * registos clínicos através de uma arquitetura centralizada.
+ */
 @WebServlet("/historico")
 public class HistoricoServlet extends HttpServlet {
+    /**
+     * Identificador de versão para a serialização da classe.
+     */
     private static final long serialVersionUID = 1L;
 
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    /**
+     * Processa os pedidos GET encaminhando para a visualização ou formulários.
+     * 
+     * @param request  Objeto que contém os dados do pedido.
+     * @param response Objeto para a resposta ao cliente.
+     */
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         String action = request.getParameter("p");
-        if (action == null) action = "list";
+        if (action == null)
+            action = "list";
 
         if ("list".equals(action)) {
             listHistorico(request, response);
@@ -30,22 +46,40 @@ public class HistoricoServlet extends HttpServlet {
         }
     }
 
-    private void listHistorico(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    /**
+     * Prepara e exibe a listagem do histórico clínico de um animal.
+     * Obtém os dados do animal e os registos históricos correspondentes
+     * para apresentação no interface.
+     * 
+     * @param request  Pedido HTTP.
+     * @param response Resposta HTTP.
+     */
+    private void listHistorico(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         String animalIdStr = request.getParameter("idAnimal");
         if (animalIdStr == null) {
             response.sendRedirect("animais");
             return;
         }
         int idAnimal = Integer.parseInt(animalIdStr);
+
         Animal animal = AnimalDAO.getById(idAnimal);
         List<java.util.Map<String, Object>> historia = HistoricoDAO.getHistoryByAnimal(idAnimal);
-        
+
         request.setAttribute("animal", animal);
         request.setAttribute("historia", historia);
+
         request.getRequestDispatcher("historico/lista.jsp").forward(request, response);
     }
-    
-    private void showNewForm(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
+    /**
+     * Apresenta o formulário para registo de novos eventos clínicos.
+     * 
+     * @param request  Pedido HTTP.
+     * @param response Resposta HTTP.
+     */
+    private void showNewForm(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         request.setAttribute("listaAnimais", AnimalDAO.getAll());
         String idAnimal = request.getParameter("idAnimal");
         if (idAnimal != null) {
@@ -54,10 +88,21 @@ public class HistoricoServlet extends HttpServlet {
         request.getRequestDispatcher("historico/novo.jsp").forward(request, response);
     }
 
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    /**
+     * Processa a submissão de novos dados clínicos.
+     * Identifica a especialização do serviço através do discriminador e
+     * instancia o objeto correspondente para persistência.
+     * 
+     * @param request  Pedido HTTP com os dados do formulário.
+     * @param response Resposta HTTP.
+     */
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         String tipo = request.getParameter("TipoDiscriminador");
         PrestacaoServico ps = null;
-        int servicoId = 1; // Default
+        int servicoId = 1;
+
+        // Instanciação baseada no tipo de serviço selecionado
         if ("Consulta".equals(tipo)) {
             Consulta c = new Consulta();
             c.setMotivo(request.getParameter("Motivo"));
@@ -104,15 +149,18 @@ public class HistoricoServlet extends HttpServlet {
             ps = v;
             servicoId = 2;
         }
-        
+
+        // Atribuição de dados comuns a todas as prestações de serviço
         ps.setDetalhesGerais(request.getParameter("DetalhesGerais"));
-        String animalIdStr = request.getParameter("Animal_IDAnimal");
-        int animalId = Integer.parseInt(animalIdStr);
+        int animalId = Integer.parseInt(request.getParameter("Animal_IDAnimal"));
         ps.setAnimalId(animalId);
-        ps.setTipoServicoId(servicoId); 
+        ps.setTipoServicoId(servicoId);
         ps.setDataHora(new Timestamp(System.currentTimeMillis()));
-        
+
+        // Execução da persistência na base de dados
         HistoricoDAO.save(ps);
-        response.sendRedirect("historico?idAnimal=" + animalId); 
+
+        // Redirecionamento para evitar re-submissão de dados
+        response.sendRedirect("historico?idAnimal=" + animalId);
     }
 }

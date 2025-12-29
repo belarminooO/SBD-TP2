@@ -1,4 +1,8 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%--
+    Listagem de todos os clientes registados (Pessoas e Empresas).
+    Permite visualizar contactos e aceder à edição de dados.
+--%>
 <%@ page import="java.util.List" %>
 <%@ page import="cliente.*" %>
 <!DOCTYPE html>
@@ -30,7 +34,7 @@
                 <h2>Lista de Clientes</h2>
                 <a href="clientes?p=edit" class="btn btn-primary">+ Novo Cliente</a>
             </div>
-            
+
             <table>
                 <thead>
                     <tr>
@@ -38,6 +42,8 @@
                         <th>Nome</th>
                         <th>Tipo</th>
                         <th>Contactos</th>
+                        <th>Morada/Localidade</th>
+                        <th>Preferência</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
@@ -51,12 +57,19 @@
                         <td><%= c.getNif() %></td>
                         <td><%= c.getNomeCompleto() %></td>
                         <td><%= c.getTipoCliente() %></td>
-                        <td><%= c.getContactos() %></td>
+                        <td><%= (c.getContactos() != null ? c.getContactos() : "-") %></td>
+                        <td>
+                            <%= (c.getMorada() != null ? c.getMorada() : "") %>
+                            <small style="display:block; color:#666;">
+                                <%= (c.getConcelho() != null ? c.getConcelho() : "") %> <%= (c.getDistrito() != null ? ", " + c.getDistrito() : "") %>
+                            </small>
+                        </td>
+                        <td><%= (c.getPreferenciasLinguisticas() != null ? c.getPreferenciasLinguisticas() : "-") %></td>
                         <td>
                             <a href="clientes?p=edit&nif=<%= c.getNif() %>" class="btn btn-sm btn-primary">Editar</a>
                         </td>
                     </tr>
-                    <% 
+                    <%
                         }
                     } else {
                     %>

@@ -1,4 +1,9 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%--
+    Lista de agendamentos do sistema.
+    Apresenta as marcações com indicação visual de estado (Pendente, Confirmado, Cancelado).
+    Permite ações de gestão dependendo do estado do agendamento.
+--%>
 <%@ page import="java.util.List" %>
 <%@ page import="agendamento.*" %>
 <!DOCTYPE html>
@@ -30,7 +35,13 @@
                 <h2>Agendamentos</h2>
                 <a href="agendamentos?p=new" class="btn btn-primary">+ Novo Agendamento</a>
             </div>
-            
+
+            <% if ("invalid_tutor".equals(request.getParameter("error"))) { %>
+                <div class="alert alert-danger">
+                    <strong>Erro:</strong> O animal selecionado não pertence ao tutor escolhido.
+                </div>
+            <% } %>
+
             <table>
                 <thead>
                     <tr>
@@ -39,10 +50,12 @@
                         <th>Animal (ID)</th>
                         <th>Cliente</th>
                         <th>Estado</th>
+                        <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     <%
+                    // DATA BINDING: Recupera a lista de objetos do domínio enviados pelo Controlador (Servlet)
                     List<Agendamento> lista = (List<Agendamento>) request.getAttribute("listaAgendamentos");
                     if (lista != null) {
                         for (Agendamento a : lista) {
@@ -61,11 +74,11 @@
                             <% } %>
                         </td>
                     </tr>
-                    <% 
+                    <%
                         }
                     } else {
                     %>
-                    <tr><td colspan="5">Sem agendamentos.</td></tr>
+                    <tr><td colspan="6">Sem agendamentos.</td></tr>
                     <% } %>
                 </tbody>
             </table>

@@ -1,66 +1,100 @@
 package manager;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.List;
-import java.util.Map;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import animal.Animal;
 import util.DataTransfer;
 
+/**
+ * Controlador central para as operações de gestão administrativa da clínica.
+ * Gere a apresentação do dashboard de indicadores, a escala de profissionais
+ * e as operações de intercâmbio de dados de pacientes.
+ */
 @WebServlet("/manager")
 public class ManagerServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
 
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    /**
+     * Processa pedidos GET para visualização do dashboard, gestão de horários e
+     * exportação de dados.
+     * 
+     * @param request  Pedido HTTP.
+     * @param response Resposta HTTP.
+     * @throws ServletException Em caso de erro no processamento do servlet.
+     * @throws IOException      Em caso de erro de entrada/saída.
+     */
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         String action = request.getParameter("p");
-        if (action == null) action = "dashboard";
+        if (action == null) {
+            action = "dashboard";
+        }
 
         if ("dashboard".equals(action)) {
+            // Carrega indicadores estatísticos e operacionais para suporte à decisão
             request.setAttribute("animaisVelhos", RelatorioDAO.getAnimaisExcedentes());
             request.setAttribute("tutoresObesos", RelatorioDAO.getTutoresAnimaisObesos());
             request.setAttribute("topCancelamentos", RelatorioDAO.getTutoresCancelamentos());
             request.setAttribute("agendaSemana", RelatorioDAO.getAgendaProximaSemana());
             request.getRequestDispatcher("manager/dashboard.jsp").forward(request, response);
         } else if ("horarios".equals(action)) {
-            // Req 4.2: List current assignments and show form
-            // Need generic lists of Horarios, Tipes, Vets
+            // Prepara a visualização da escala de turnos e alocação de profissionais
             request.setAttribute("listaEscalas", EscalonamentoDAO.getAll());
-            // We need DAO methods to get all Horarios/Vets/Servicos. 
-            // Assuming AgendamentoDAO/VeterinarioDAO have them or simple getters.
             request.setAttribute("listaVets", veterinario.VeterinarioDAO.getAll());
             request.setAttribute("listaTipos", agendamento.AgendamentoDAO.getTiposServico());
-            // Need getAllHorarios - Assuming exists or mocking/adding to AgendamentoDAO if needed. 
-            // Actually Horario table needs a DAO. Doing quick inline fetch or assuming AgendamentoDAO could carry it.
-            // Let's rely on a helper or just not list empty slots for simplicity, 
-            // OR strictly: we need to assign vets to *existing* slots. 
-            // I'll add a helper to AgendamentoDAO for getAllHorarios quickly if not there.
-            request.setAttribute("listaHorarios", agendamento.AgendamentoDAO.getAllHorarios()); 
+            request.setAttribute("listaHorarios", agendamento.AgendamentoDAO.getAllHorarios());
             request.getRequestDispatcher("manager/horarios.jsp").forward(request, response);
         } else if ("xml".equals(action)) {
             exportFullProfile(request, response, "xml");
         } else if ("json".equals(action)) {
             exportFullProfile(request, response, "json");
         } else if ("import".equals(action)) {
-             String xmlContent = request.getParameter("xmlData");
-             if (xmlContent != null) {
-                 DataTransfer.importAnimalFullProfileXml(new java.io.ByteArrayInputStream(xmlContent.getBytes()));
-                 response.sendRedirect("manager?msg=Importado+com+sucesso");
-             } else {
-                 response.sendRedirect("manager?msg=Erro+na+importacao");
-             }
+            processImport(request, response);
         }
     }
 
-    private void exportFullProfile(HttpServletRequest request, HttpServletResponse response, String format) throws IOException {
+    /**
+     * Processa a importação de perfis de animais em formato XML ou JSON.
+     * 
+     * @param request  Pedido HTTP contendo os dados de importação.
+     * @param response Resposta HTTP.
+     * @throws IOException Em caso de erro de entrada/saída.
+     */
+    private void processImport(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String xmlContent = request.getParameter("xmlData");
+        String jsonContent = request.getParameter("jsonData");
+        boolean success = false;
+
+        if (xmlContent != null && !xmlContent.trim().isEmpty()) {
+            success = DataTransfer.importAnimalFullProfileXml(new java.io.ByteArrayInputStream(xmlContent.getBytes()));
+        } else if (jsonContent != null && !jsonContent.trim().isEmpty()) {
+            success = DataTransfer.importAnimalFullProfileJson(jsonContent);
+        }
+
+        String msg = success ? "Importado com sucesso" : "Erro na importação";
+        response.sendRedirect("manager?msg=" + java.net.URLEncoder.encode(msg, "UTF-8"));
+    }
+
+    /**
+     * Executa a exportação do perfil completo de um animal no formato solicitado.
+     * 
+     * @param request  Pedido HTTP.
+     * @param response Resposta HTTP.
+     * @param format   Formato de exportação ("xml" ou "json").
+     * @throws IOException Em caso de erro de escrita na resposta.
+     */
+    private void exportFullProfile(HttpServletRequest request, HttpServletResponse response, String format)
+            throws IOException {
         String idStr = request.getParameter("id");
-        if (idStr == null) return;
+        if (idStr == null) {
+            return;
+        }
         int animalId = Integer.parseInt(idStr);
-        
+
         if ("xml".equals(format)) {
             response.setContentType("text/xml");
             response.setHeader("Content-Disposition", "attachment; filename=\"animal_" + animalId + ".xml\"");
@@ -71,13 +105,24 @@ public class ManagerServlet extends HttpServlet {
             DataTransfer.exportAnimalFullProfileJson(animalId, response.getWriter());
         }
     }
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
+    /**
+     * Processa pedidos POST para atualizações na escala de profissionais.
+     * 
+     * @param request  Pedido HTTP.
+     * @param response Resposta HTTP.
+     * @throws ServletException Em caso de erro no processamento.
+     * @throws IOException      Em caso de erro de entrada/saída.
+     */
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         String action = request.getParameter("action");
         if ("atribuir".equals(action)) {
-            int fh = Integer.parseInt(request.getParameter("IDHorario"));
-            int fs = Integer.parseInt(request.getParameter("IDServico"));
-            String lic = request.getParameter("NLicenca");
-            EscalonamentoDAO.atribuir(fh, fs, lic);
+            int idHorario = Integer.parseInt(request.getParameter("IDHorario"));
+            int idServico = Integer.parseInt(request.getParameter("IDServico"));
+            String nLicenca = request.getParameter("NLicenca");
+            EscalonamentoDAO.atribuir(idHorario, idServico, nLicenca);
             response.sendRedirect("manager?p=horarios");
         }
     }

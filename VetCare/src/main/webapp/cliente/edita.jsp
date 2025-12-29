@@ -1,4 +1,8 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%--
+    Ficha de gestão de cliente (Pessoa ou Empresa).
+    Para clientes empresariais, exige o preenchimento do Capital Social.
+--%>
 <%@ page import="cliente.*" %>
 <!DOCTYPE html>
 <html>
@@ -7,6 +11,7 @@
 <title>VetCare - Editar Cliente</title>
 <link rel="stylesheet" href="${pageContext.request.contextPath}/css/style.css">
 <script>
+/** Alterna a visibilidade do campo Capital Social com base no tipo de cliente (Req 1.2) */
 function toggleEmpresa(val) {
     const div = document.getElementById('divCapital');
     const input = div.querySelector('input');
@@ -20,7 +25,7 @@ function toggleEmpresa(val) {
 }
 </script>
 </head>
-<body>
+<body onload="toggleEmpresa(document.getElementById('tipoSelector').value)">
 
     <div class="header">
         <div class="container">
@@ -40,23 +45,23 @@ function toggleEmpresa(val) {
             String nif = (c != null) ? c.getNif() : "";
             String nome = (c != null) ? c.getNomeCompleto() : "";
             %>
-            
+
             <form action="clientes" method="post">
                 <p><small style="color: red;">* Campos Obrigatórios</small></p>
-                
+
                 <div style="margin-bottom:15px;">
                     <label>Tipo de Cliente: <span style="color:red;">*</span></label>
-                    <select name="TipoCliente" onchange="toggleEmpresa(this.value)">
+                    <select name="TipoCliente" id="tipoSelector" onchange="toggleEmpresa(this.value)">
                         <option value="Pessoa" <%= (c instanceof ClientePessoa) ? "selected" : "" %>>Pessoa</option>
                         <option value="Empresa" <%= (c instanceof ClienteEmpresa) ? "selected" : "" %>>Empresa</option>
                     </select>
                 </div>
-                
+
                 <div style="margin-bottom:15px;">
                     <label>NIF: <span style="color:red;">*</span></label>
                     <input type="text" name="NIF" value="<%= nif %>" required pattern="\d{9}" title="O NIF deve ter 9 dígitos" maxlength="9">
                 </div>
-                
+
                 <div style="margin-bottom:15px;">
                     <label>Nome Completo: <span style="color:red;">*</span></label>
                     <input type="text" name="NomeCompleto" value="<%= nome %>" required style="width:100%">
@@ -91,12 +96,12 @@ function toggleEmpresa(val) {
                     <label>Preferências Linguísticas (opcional):</label>
                     <input type="text" name="PreferenciasLinguisticas" value="<%= (c!=null && c.getPreferenciasLinguisticas()!=null) ? c.getPreferenciasLinguisticas() : "" %>" style="width:100%">
                 </div>
-                
+
                 <div id="divCapital" style="display:none; margin-bottom:15px;">
                      <label>Capital Social:</label>
                      <input type="number" name="CapitalSocial" step="0.01" value="<%= (c instanceof ClienteEmpresa && ((ClienteEmpresa)c).getCapitalSocial()!=null) ? ((ClienteEmpresa)c).getCapitalSocial() : "" %>">
                 </div>
-                
+
                 <button type="submit" class="btn btn-primary">Gravar</button>
                 <a href="clientes" class="btn btn-secondary">Cancelar</a>
             </form>

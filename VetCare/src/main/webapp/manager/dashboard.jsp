@@ -1,4 +1,8 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%--
+    Painel de Gestão (Dashboard).
+    Centraliza indicadores de negócio, alertas operacionais e ferramentas de exportação/importação de dados.
+--%>
 <%@ page import="java.util.*" %>
 <%@ page import="animal.Animal" %>
 <!DOCTYPE html>
@@ -22,15 +26,15 @@
     </div>
 
     <div class="container">
-        
+
         <div class="card" style="background: #eef2ff; border-left: 5px solid #4f46e5;">
-            <h3>4.2 Gestão de Escalonamento</h3>
-            <p>Atribua veterinários aos horários de funcionamento e serviços da clínica.</p>
+            <h3>Gestão de Escalonamento</h3>
+            <p>Atribuição de veterinários aos horários de funcionamento e serviços da clínica.</p>
             <a href="${pageContext.request.contextPath}/manager?p=horarios" class="btn btn-primary">Ir para Gestão de Escalas</a>
         </div>
-        
+
         <div class="card">
-            <h3>4.5 Animais com Expetativa de Vida Excedida</h3>
+            <h3>Animais com Expectativa de Vida Excedida</h3>
             <ul>
             <% List<Animal> velhos = (List<Animal>) request.getAttribute("animaisVelhos");
                if(velhos!=null) for(Animal a : velhos) { %>
@@ -38,9 +42,9 @@
             <% } %>
             </ul>
         </div>
-        
+
         <div class="card">
-            <h3>4.6 Tutores com Animais com Excesso de Peso</h3>
+            <h3>Tutores com Animais com Excesso de Peso</h3>
             <ul>
             <% Map<String, Integer> obesos = (Map<String, Integer>) request.getAttribute("tutoresObesos");
                if(obesos!=null) for(Map.Entry<String,Integer> e : obesos.entrySet()) { %>
@@ -50,7 +54,7 @@
         </div>
 
         <div class="card">
-            <h3>4.7 Top Cancelamentos (Último Trimestre)</h3>
+            <h3>Top Cancelamentos (Último Trimestre)</h3>
             <ul>
             <% List<String> cancels = (List<String>) request.getAttribute("topCancelamentos");
                if(cancels!=null) for(String s : cancels) { %>
@@ -60,8 +64,8 @@
         </div>
 
         <div class="card" style="border-left: 5px solid #6366f1;">
-            <h3>4.3 Exportar Perfil de Animal (XML/JSON)</h3>
-            <p style="font-size: 0.9rem; color: #666;">Selecione um animal para exportar a sua ficha e histórico clínico completo.</p>
+            <h3>Exportar Perfil de Animal (XML/JSON)</h3>
+            <p style="font-size: 0.9rem; color: #666;">Seleção de animal para exportação da ficha e histórico clínico completo.</p>
             <form action="manager" method="get" style="display:flex; gap:10px; align-items:flex-end;">
                 <input type="hidden" name="p" value="xml">
                 <div style="flex:1;">
@@ -77,20 +81,20 @@
                 <button type="submit" name="p" value="json" class="btn btn-secondary">Exportar JSON</button>
             </form>
         </div>
-        
+
         <div class="card">
-            <h3>4.4 Importar Perfil de Animal (XML/JSON)</h3>
-            <p style="font-size: 0.9rem; color: #666;">Cole o conteúdo do documento para importar a ficha e o histórico clínico.</p>
+            <h3>Importar Perfil de Animal (XML/JSON)</h3>
+            <p style="font-size: 0.9rem; color: #666;">Inserção de conteúdo para importação da ficha e do histórico clínico.</p>
             <form action="manager" method="get">
                 <input type="hidden" name="p" value="import">
                 <div style="display:flex; gap:10px;">
                     <div style="flex:1;">
                         <label>Conteúdo XML:</label>
-                        <textarea name="xmlData" style="width:100%; height:80px;" placeholder="Cole o XML aqui..."></textarea>
+                        <textarea name="xmlData" style="width:100%; height:80px;" placeholder="Conteúdo XML..."></textarea>
                     </div>
                     <div style="flex:1;">
                         <label>Conteúdo JSON:</label>
-                        <textarea name="jsonData" style="width:100%; height:80px;" placeholder="Cole o JSON aqui..."></textarea>
+                        <textarea name="jsonData" style="width:100%; height:80px;" placeholder="Conteúdo JSON..."></textarea>
                     </div>
                 </div>
                 <button type="submit" class="btn btn-secondary" style="margin-top:10px;">Importar Dados</button>
@@ -101,7 +105,7 @@
         </div>
 
         <div class="card">
-            <h3>4.8 Agenda Próxima Semana</h3>
+            <h3>Agenda Próxima Semana</h3>
             <ul>
             <% Map<String, Integer> agenda = (Map<String, Integer>) request.getAttribute("agendaSemana");
                if(agenda!=null) for(Map.Entry<String,Integer> e : agenda.entrySet()) { %>

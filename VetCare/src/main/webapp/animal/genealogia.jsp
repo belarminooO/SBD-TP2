@@ -1,5 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
-pageEncoding="UTF-8"%> <%@ page import="animal.Animal" %>
+pageEncoding="UTF-8"%> <%-- Página de visualização da genealogia do animal.
+Exibe os ascendentes (pais) e informações do paciente. --%> <%@ page
+import="animal.Animal" %>
 <!DOCTYPE html>
 <html>
   <head>
@@ -45,7 +47,7 @@ pageEncoding="UTF-8"%> <%@ page import="animal.Animal" %>
     <div class="container">
       <div class="card" style="text-align: center">
         <% Animal a = (Animal) request.getAttribute("animal"); %>
-        <h2>🧬 Árvore Genealógica</h2>
+        <h2>Árvore Genealógica</h2>
 
         <div
           class="tree-container"

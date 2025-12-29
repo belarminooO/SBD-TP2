@@ -10,72 +10,140 @@ import java.util.Base64;
 import javax.imageio.*;
 import javax.swing.*;
 
+/**
+ * Utilitário para gestão de imagens em formato binário (BLOB).
+ * 
+ * Fornece funcionalidades para carregamento, armazenamento, visualização e
+ * comparação
+ * de ficheiros de imagem. Inclui um algoritmo de comparação pixel-a-pixel para
+ * deteção de semelhanças entre imagens.
+ * 
+ * Suporta conversão entre formatos byte array, Base64 e BufferedImage,
+ * facilitando
+ * a integração com bases de dados e interfaces gráficas.
+ */
 public class Foto {
+	/**
+	 * Array de bytes contendo os dados binários da imagem.
+	 */
 	byte[] img = null;
 
+	/**
+	 * Nome do ficheiro de imagem padrão quando nenhuma foto está disponível.
+	 */
 	public final static String omissa = "silhueta.jpg";
+
+	/**
+	 * Caminho base para localização dos ficheiros de imagem.
+	 */
 	public static String path = new Configura().getRealPath();
 
-	public static void main(String[] args) throws Exception { 
+	/**
+	 * Método principal para testes e demonstração da funcionalidade.
+	 * 
+	 * @param args Argumentos de linha de comando (não utilizados).
+	 * @throws Exception Se ocorrer erro no carregamento ou processamento das
+	 *                   imagens.
+	 */
+	public static void main(String[] args) throws Exception {
 		Foto ft1 = new Foto();
 		Foto ft2 = new Foto();
-		String f1="silhueta.jpg";
-		String f2="silhueta.png";
+		String f1 = "silhueta.jpg";
+		String f2 = "silhueta.png";
 		Foto.setPath(path);
 		ft1.load(f1);
-		ft1.show("Fotografia: "+f1);
+		ft1.show("Fotografia: " + f1);
 		ft2.load(f2);
-		ft2.show("Fotografia: "+f2);
-		System.out.println("Semelhança: "+ft1.compareTo(ft2)+"%");
+		ft2.show("Fotografia: " + f2);
+		System.out.println("Semelhança: " + ft1.compareTo(ft2) + "%");
 	}
-	// modifica o caminho estabelecido por omissão
+
+	/**
+	 * Define o caminho base para localização dos ficheiros de imagem.
+	 * 
+	 * @param path Caminho absoluto para o diretório de imagens.
+	 */
 	public static void setPath(String path) {
-		Foto.path=path;
+		Foto.path = path;
 	}
-	// modifica o byte[] armazenado
+
+	/**
+	 * Define os dados binários da imagem.
+	 * 
+	 * @param img Array de bytes contendo a imagem.
+	 */
 	public void setFoto(byte[] img) {
-		this.img=img;
+		this.img = img;
 	}
-	//devolve o byte[] armazenado
+
+	/**
+	 * Retorna os dados binários da imagem armazenada.
+	 * 
+	 * @return Array de bytes da imagem.
+	 */
 	public byte[] getFoto() {
 		return img;
 	}
-	// usa base64 para modificar o byte[] armazenado 
+
+	/**
+	 * Define os dados da imagem a partir de uma string codificada em Base64.
+	 * 
+	 * @param encoded64 String Base64 representando a imagem.
+	 */
 	public void setFoto64(String encoded64) {
-		Base64.getDecoder().decode(encoded64);
+		this.img = Base64.getDecoder().decode(encoded64);
 	}
-	// devolve a imagem em base64
+
+	/**
+	 * Retorna a imagem codificada em formato Base64.
+	 * 
+	 * @return String Base64 da imagem.
+	 */
 	public String getFoto64() {
 		return Base64.getEncoder().encodeToString(img);
 	}
-	// transforma o byte[] em BufferedImage
+
+	/**
+	 * Converte um array de bytes numa instância de BufferedImage.
+	 * 
+	 * @param imageData Dados binários da imagem.
+	 * @return BufferedImage criada a partir dos dados.
+	 * @throws RuntimeException Se ocorrer erro na leitura dos dados.
+	 */
 	private static BufferedImage createImageFromBytes(byte[] imageData) {
 		try (ByteArrayInputStream bais = new ByteArrayInputStream(imageData);) {
-			// RGBA stands for red green blue alpha.
-			// TYPE_INT_ARGB means that we are
-			// representing the RGBA
-			// component of the image pixel using 8 bit
-			// integer value.
-			// image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
 			return ImageIO.read(bais);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
 	}
-	// devolve o objeto que representa a imagem
+
+	/**
+	 * Retorna a representação BufferedImage da imagem armazenada.
+	 * 
+	 * @return BufferedImage da foto.
+	 */
 	public BufferedImage getBufferedImage() {
 		return Foto.createImageFromBytes(img);
 	}
-	// facilita o título da janela por omissão
+
+	/**
+	 * Apresenta a imagem numa janela gráfica com título padrão.
+	 */
 	public void show() {
 		show("Fotografia");
 	}
-	// mostra a imagem mantida no byte[] foto
+
+	/**
+	 * Apresenta a imagem numa janela gráfica com título personalizado.
+	 * Se nenhuma imagem estiver carregada, tenta carregar a imagem padrão.
+	 * 
+	 * @param titulo Título da janela de visualização.
+	 */
 	public void show(String titulo) {
 		SwingUtilities.invokeLater(new Runnable() {
 			public void run() {
 				JFrame editorFrame = new JFrame(titulo);
-				// editorFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 				BufferedImage image = null;
 				if (img == null)
 					try {
@@ -94,50 +162,64 @@ public class Foto {
 			}
 		});
 	}
-	// define a imagem a partir do ficheiro indicado em parametro
+
+	/**
+	 * Carrega uma imagem a partir de um ficheiro no disco.
+	 * 
+	 * @param filename Nome do ficheiro de imagem (relativo ao caminho base).
+	 * @throws Exception Se ocorrer erro na leitura do ficheiro.
+	 */
 	public void load(final String filename) throws Exception {
-		// Creating an object of File class and
-		// providing local directory path of a file
 		File file = new File(path + filename);
-		// Creating an object of FileInputStream to
-		// read from a file
 		FileInputStream fl = new FileInputStream(file);
-		// Now creating byte array of same length as file
 		img = new byte[(int) file.length()];
-		// Reading file content to byte array
-		// using standard read() method
 		fl.read(img);
-		// lastly closing an instance of file input stream
-		// to avoid memory leakage
 		fl.close();
 	}
-	// escreve a imagem no ficheiro indicado em parametro
+
+	/**
+	 * Grava a imagem armazenada num ficheiro no disco.
+	 * 
+	 * @param filename Nome do ficheiro de destino (relativo ao caminho base).
+	 * @throws Exception Se ocorrer erro na escrita do ficheiro.
+	 */
 	public void save(final String filename) throws Exception {
-		 FileOutputStream fos = new FileOutputStream(path + filename); 
-         fos.write(img);
-         fos.close();
+		FileOutputStream fos = new FileOutputStream(path + filename);
+		fos.write(img);
+		fos.close();
 	}
-	// Compara com a imagem e devolve a percentagem de semelhança
+
+	/**
+	 * Compara esta imagem com outra e calcula a percentagem de semelhança.
+	 * 
+	 * Utiliza um algoritmo de comparação pixel-a-pixel que analisa as diferenças
+	 * nos componentes RGB de cada pixel. A métrica resultante varia entre 0%
+	 * (completamente
+	 * diferentes) e 100% (idênticas).
+	 * 
+	 * As imagens devem ter as mesmas dimensões para serem comparáveis.
+	 * 
+	 * @param ft Foto a comparar com esta instância.
+	 * @return BigDecimal representando a percentagem de semelhança (0-100).
+	 * @throws Exception Se as dimensões das imagens não coincidirem ou ocorrer erro
+	 *                   no processamento.
+	 */
 	public BigDecimal compareTo(Foto ft) throws Exception {
 		BufferedImage imgA = getBufferedImage();
 		BufferedImage imgB = ft.getBufferedImage();
-		// Assigning dimensions to image
 		int width1 = imgA.getWidth();
 		int width2 = imgB.getWidth();
 		int height1 = imgA.getHeight();
 		int height2 = imgB.getHeight();
-		// Checking whether the images are of same size
+
 		if ((width1 != width2) || (height1 != height2)) {
-			// Display message straightaway
-			System.out.println("Error: Images dimensions" + " mismatch");
+			System.err.println("Erro: As dimensões das imagens não coincidem.");
 			return new BigDecimal(-1);
 		}
-		// By now, images are of same size
+
 		long difference = 0;
-		// Treating images likely 2D matrix
-		// Outer loop for rows(height)
+
 		for (int y = 0; y < height1; y++) {
-			// Inner loop for columns(width)
 			for (int x = 0; x < width1; x++) {
 				int rgbA = imgA.getRGB(x, y);
 				int rgbB = imgB.getRGB(x, y);
@@ -152,18 +234,11 @@ public class Foto {
 				difference += Math.abs(blueA - blueB);
 			}
 		}
-		// Total number of red pixels = width * height
-		// Total number of blue pixels = width * height
-		// Total number of green pixels = width * height
-		// So total number of pixels = width * height * 3
+
 		double total_pixels = width1 * height1 * 3;
-		// Normalizing the value of different pixels
-		// for accuracy
-		// Note: Average pixels per color component
 		double avg_different_pixels = difference / total_pixels;
-		// There are 255 values of pixels in total
 		double percentage = (avg_different_pixels / 255) * 100;
-		BigDecimal bd = BigDecimal.valueOf(100-percentage);
+		BigDecimal bd = BigDecimal.valueOf(100 - percentage);
 		return bd.setScale(2, RoundingMode.HALF_UP);
 	}
 }

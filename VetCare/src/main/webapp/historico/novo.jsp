@@ -1,4 +1,8 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%--
+    Interface para criação de novos registos clínicos.
+    Adapta o formulário dinamicamente consoante o tipo de serviço selecionado (Consulta, Cirurgia, etc.).
+--%>
 <%@ page import="java.util.List" %>
 <%@ page import="animal.*" %>
 <!DOCTYPE html>
@@ -8,8 +12,13 @@
 <title>VetCare - Novo Registo Clínico</title>
 <link rel="stylesheet" href="${pageContext.request.contextPath}/css/style.css">
 <script>
+/**
+ * Altera os campos visíveis no formulário dependendo do serviço escolhido.
+ * @param val O nome do tipo de discriminador (Consulta, Vacina, etc.)
+ */
 function toggleType(val) {
     const types = ['divConsulta', 'divVacina', 'divExameFisico', 'divResultadoExame', 'divDesparasitacao', 'divCirurgia', 'divTratamento'];
+
     types.forEach(t => {
         const el = document.getElementById(t);
         if (el) {
@@ -18,7 +27,7 @@ function toggleType(val) {
             inputs.forEach(i => i.disabled = true);
         }
     });
-    
+
     let target = '';
     if (val === 'Consulta') target = 'divConsulta';
     else if (val === 'Vacinacao') target = 'divVacina';
@@ -27,7 +36,7 @@ function toggleType(val) {
     else if (val === 'Desparasitacao') target = 'divDesparasitacao';
     else if (val === 'Cirurgia') target = 'divCirurgia';
     else if (val === 'TratamentoTerapeutico') target = 'divTratamento';
-    
+
     if (target) {
         const targetEl = document.getElementById(target);
         if (targetEl) {
@@ -54,7 +63,7 @@ function toggleType(val) {
     <div class="container">
         <div class="card">
             <h2>Novo Registo Clínico</h2>
-            
+
             <form action="historico" method="post">
                 <div style="margin-bottom:15px;">
                     <label>Tipo de Serviço:</label>
@@ -68,26 +77,26 @@ function toggleType(val) {
                         <option value="TratamentoTerapeutico">Tratamento Terapêutico</option>
                     </select>
                 </div>
-                
+
                 <div style="margin-bottom:15px;">
                     <label>Animal:</label>
                     <select name="Animal_IDAnimal" required class="form-control">
-                        <% 
+                        <%
                            Integer selectedId = (Integer) request.getAttribute("selectedAnimalId");
                            List<Animal> animais = (List<Animal>) request.getAttribute("listaAnimais");
-                           if(animais!=null) for(Animal a : animais) { 
-                               boolean isSelected = (selectedId != null && selectedId.equals(a.getIdAnimal()));
+                           if(animais!=null) for(Animal a : animais) {
+                                boolean isSelected = (selectedId != null && selectedId.equals(a.getIdAnimal()));
                         %>
                            <option value="<%= a.getIdAnimal() %>" <%= isSelected ? "selected" : "" %>><%= a.getNome() %></option>
                         <% } %>
                     </select>
                 </div>
-                
+
                 <div style="margin-bottom:15px;">
                     <label>Observações / Detalhes Gerais:</label>
                     <textarea name="DetalhesGerais" rows="2" style="width:100%" placeholder="Notas adicionais..."></textarea>
                 </div>
-                
+
                 <hr>
 
                 <!-- Campos Consulta -->
@@ -110,7 +119,7 @@ function toggleType(val) {
                         <input type="text" name="MedicacaoPrescrita" style="width:100%">
                     </div>
                 </div>
-                
+
                 <!-- Campos Vacina -->
                 <div id="divVacina" style="display:none;">
                     <h3>Dados da Vacinação</h3>

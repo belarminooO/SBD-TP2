@@ -1,4 +1,8 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%--
+    Listagem de veterinários do corpo clínico.
+    Permite visualizar e editar os dados cadastrais dos profissionais.
+--%>
 <%@ page import="java.util.List" %>
 <%@ page import="veterinario.Veterinario" %>
 <!DOCTYPE html>
@@ -27,15 +31,15 @@
     <div class="container">
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <h2>Lista de Veterinários</h2>
+                <h2>Veterinários Registados</h2>
                 <a href="vets?p=edit" class="btn btn-primary">+ Novo Veterinário</a>
             </div>
-            
+
             <table>
                 <thead>
                     <tr>
-                        <th>Nº Licença</th>
-                        <th>Nome</th>
+                        <th>Cédula (NLicenca)</th>
+                        <th>Nome Profissional</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
@@ -49,14 +53,14 @@
                         <td><%= v.getNLicenca() %></td>
                         <td><%= v.getNome() %></td>
                         <td>
-                            <a href="vets?p=edit&lic=<%= v.getNLicenca() %>" class="btn btn-sm">Editar</a>
+                            <a href="vets?p=edit&id=<%= v.getNLicenca() %>" class="btn btn-sm">Editar</a>
                         </td>
                     </tr>
-                    <% 
+                    <%
                         }
                     } else {
                     %>
-                    <tr><td colspan="3">Nenhum veterinário encontrado.</td></tr>
+                    <tr><td colspan="3">Sem registos.</td></tr>
                     <% } %>
                 </tbody>
             </table>

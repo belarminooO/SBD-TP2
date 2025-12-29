@@ -15,156 +15,172 @@ import java.util.regex.Pattern;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 🇵🇹 Classe de Utilidades (`Name`) para Normalização, Redução e Determinação de Género de Nomes Próprios.
- * Logging implementado com wrapper temporário 'Log'.
+ * Motor de processamento e normalização de nomes.
+ * 
+ * Implementa funcionalidades para:
+ * - Normalização de capitalização e tratamento de partículas.
+ * - Redução progressiva de nomes para ajuste a limites de caracteres.
+ * - Deteção de género baseada no primeiro nome.
+ * - Correção ortográfica de nomes comuns.
+ * 
+ * Suporta múltiplos idiomas (Português, Espanhol, Francês, Inglês)
+ * e o tratamento de partículas, apóstrofos e hífens.
  */
 public class Name {
-
-    // ----------------------------------------------------------------------
-    // --- 💡 IMPLEMENTAÇÃO TEMPORÁRIA DE LOGGING (NOME CLARO: Log) ---
-    // ----------------------------------------------------------------------
+	
+    // --- COMPONENTE DE LOGGING ---
 
     /**
-     * 💡 Classe interna temporária que simula um logger (INFO/WARN/ERROR) para stdout/stderr.
-     * Deve ser removida e substituída por SLF4J no ambiente de produção.
+     * Utilitário interno para registo de mensagens (logs).
      */
     private static final class Log {
         public static void info(String message) {
-        		if (Configura.isWebEnvironment())
-        			System.out.println(message);
+            if (Configura.isWebEnvironment())
+                System.out.println(message);
         }
+
         public static void warn(String message) {
-        		if (Configura.isWebEnvironment())
-        			System.err.println("⚠️ WARN: " + message);
+            if (Configura.isWebEnvironment())
+                System.err.println("AVISO: " + message);
         }
+
         public static void error(String message) {
-            System.err.println("❌ ERROR: " + message);
+            System.err.println("ERRO: " + message);
         }
     }
-    
-    // --- CONFIGURAÇÃO DE CAMINHOS E VARIÁVEIS ---
-    
-    // Caminho de FALLBACK para Consola/IDE (Assume estrutura Maven/Eclipse)
-    private static final String CORR_FILE 			= "corrector.txt";
-    private static final String GENERO_FILE 			= "gender.txt";
-    private static final String FALLBACK_PATH   		= "src/main/webapp/WEB-INF/resources/";
-    
+
+    // --- CONFIGURAÇÃO DE RECURSOS ---
+
+    /** Caminho padrao para ficheiros de recursos (ambiente de desenvolvimento). */
+    private static final String CORR_FILE = "corrector.txt";
+    private static final String GENERO_FILE = "gender.txt";
+    private static final String FALLBACK_PATH = "src/main/webapp/WEB-INF/resources/";
+
     private static boolean resourcesLoaded = false;
-    private static volatile boolean isInitialized = false; 
-    
+    private static volatile boolean isInitialized = false;
+
     private static ConcurrentHashMap<String, String> MAPA_CORR;
     private static ConcurrentHashMap<String, String> MAPA_GENERO;
 
-     // Lista de Conectores/Artigos que não devem ser capitalizados (em minúsculas)
-	// 🌐 Inclui partículas de ligação em Português, Espanhol, Francês e Inglês.
-	private static final List<String> CONNECTORS = Arrays.asList(
-		 // PT (da, de, do, e, as, os, etc. + contrações)
-		 "da", "de", "do", "das", "dos", "e", "os", "a", "o", "as", "por", "que", "para", "com", "sem", "ou", 
-		 "em", "no", "na", "nos", "nas", // Contrações de 'em' + artigos
-		 
-		 // ES (del, la, las, los, el, y)
-		 "del", "la", "las", "los", "el", "y",
-		 
-		 // FR (du, le, les)
-		 "du", "le", "les", 
-		 
-		 // EN / Outras (of, and, the, von)
-		 "of", "and", "the", "von", "van", "zu"
-	 );
+    /**
+     * Lista de conectores e artigos que devem permanecer em minúsculas
+     * (Português, Espanhol, Francês, Inglês/Alemão).
+     */
+    private static final List<String> CONNECTORS = Arrays.asList(
+            // PT
+            "da", "de", "do", "das", "dos", "e", "os", "a", "o", "as", "por", "que", "para", "com", "sem", "ou",
+            "em", "no", "na", "nos", "nas",
+            // ES
+            "del", "la", "las", "los", "el", "y",
+            // FR
+            "du", "le", "les",
+            // EN/DE/Outros
+            "of", "and", "the", "von", "van", "zu");
 
     private static final Pattern SPACE_PATTERN = Pattern.compile("\\s+");
 
-    // --- MÉTODOS AUXILIARES DE FALLBACK ---
+    // --- MÉTODOS DE FALLBACK ---
 
-    /** 💾 Retorna o conjunto mínimo de correções hardcoded como um mapa imutável (Java 9+). */
+    /**
+     * Devolve um mapa base de correções para situações de falha no carregamento.
+     */
     private static Map<String, String> getHardcodedCorrecoes() {
         return Map.of(
-            "profirio", "Porfírio",
-            "acacia", "Acácia",
-            "goncalves", "Gonçalves",
-            "luis", "Luís"
-        );
+                "profirio", "Porfírio",
+                "acacia", "Acácia",
+                "goncalves", "Gonçalves",
+                "luis", "Luís");
     }
 
-    // --- BLOCO STATIC: Executado primeiro. Tenta carregar o caminho de Consola/IDE. ---
+    // Inicialização estática (tentativa de carregamento em ambiente local/IDE)
     static {
-	    	if (!resourcesLoaded) {
-	        // 1. Inicializa os mapas (mutáveis)
-	        MAPA_CORR = new ConcurrentHashMap<>(); 
-	        MAPA_CORR.putAll(getHardcodedCorrecoes()); // Adiciona o fallback
-	        MAPA_GENERO = new ConcurrentHashMap<>();
-	
-	        // 2. Tenta carregar os recursos usando o caminho de Consola (se não for Web)
-	        resourcesLoaded= loadResources(FALLBACK_PATH+CORR_FILE, MAPA_CORR) &&
-	        					 loadResources(FALLBACK_PATH+GENERO_FILE, MAPA_GENERO);
-	        // Agora, chamada clara: Log.info
-	        Log.info("🤖 Bloco Static Name.java executado."); 
-	    }
-    }
-    
-    // ---------------------------------------------------------------------------------
-    // --- MÉTODO PARA INICIAR NA WEB (USO, SERVLET: StartupInitializerServlet.java) ---
-    // ---------------------------------------------------------------------------------
+        if (!resourcesLoaded) {
+            MAPA_CORR = new ConcurrentHashMap<>();
+            MAPA_CORR.putAll(getHardcodedCorrecoes());
+            MAPA_GENERO = new ConcurrentHashMap<>();
 
-    /** * 🌐 Deve ser chamado uma vez no arranque da aplicação Web.    */
-    /** * Pode ser chamadado automaticamente pelo servlet no arranque. */
+            // Tenta carregar recursos locais se disponiveis
+            resourcesLoaded = loadResources(FALLBACK_PATH + CORR_FILE, MAPA_CORR) &&
+                    loadResources(FALLBACK_PATH + GENERO_FILE, MAPA_GENERO);
+
+            Log.info("Inicialização estática de Name.java concluída.");
+        }
+    }
+
+    // --- INICIALIZAÇÃO WEB ---
+
+    /**
+     * Inicializa o motor com o caminho real dos recursos no servidor.
+     * Deve ser invocado no arranque da aplicação Web.
+     * 
+     * @param path caminho absoluto para a pasta de recursos da aplicação
+     */
     public static synchronized void initialize(String path) {
         if (isInitialized) {
-            Log.warn("Name.java já foi inicializado. Ignorando chamada duplicada."); 
+            Log.warn("Name.java já se encontra inicializado.");
             return;
         }
-        
-        if (path != null && !path.isEmpty()) {
-        		path = path.endsWith("/") || path.endsWith("\\") ? path : path + "/";
-            // Log.info com concatenação
-            Log.info("📂 Name.java inicializado com o caminho Web: " + path); 
 
-            // RECARRREGAMENTO: Limpa e recarrega os mapas com o caminho web correto.
+        if (path != null && !path.isEmpty()) {
+            path = path.endsWith("/") || path.endsWith("\\") ? path : path + "/";
+            Log.info("Name.java inicializado com caminho: " + path);
+
             MAPA_CORR.clear();
-            MAPA_CORR.putAll(getHardcodedCorrecoes()); 
+            MAPA_CORR.putAll(getHardcodedCorrecoes());
             MAPA_GENERO.clear();
-            isInitialized = loadResources(path+CORR_FILE, MAPA_CORR) &&
-            					loadResources(path+GENERO_FILE, MAPA_GENERO);
+
+            isInitialized = loadResources(path + CORR_FILE, MAPA_CORR) &&
+                    loadResources(path + GENERO_FILE, MAPA_GENERO);
+
             MAPA_CORR = (ConcurrentHashMap<String, String>) Collections.unmodifiableMap(MAPA_CORR);
             MAPA_GENERO = (ConcurrentHashMap<String, String>) Collections.unmodifiableMap(MAPA_GENERO);
         }
     }
 
-    // ----------------------------------------------------------------------
-    // --- MÉTODOS AUXILIARES DE CARREGAMENTO PRIVADOS ---
-    // ----------------------------------------------------------------------
+    // --- MÉTODOS DE LEITURA DE RECURSOS ---
 
-    /** 💾 Carrega os dados para o mapa, usando o caminho indicado. */
+    /**
+     * Carrega pares chave-valor de um ficheiro de texto para um mapa.
+     * 
+     * @param filePath  caminho do ficheiro
+     * @param targetMap mapa de destino
+     * @return true se carregado com sucesso
+     */
     private static boolean loadResources(String filePath, Map<String, String> targetMap) {
-        
         if (filePath == null) {
             return false;
         }
 
         Path path = Paths.get(filePath);
-        
+
         if (Files.exists(path) && Files.isReadable(path)) {
             try (BufferedReader br = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
                 readFromReader(br, targetMap);
-                Log.info("... ✅ SUCESSO. Foram carregados '"+targetMap.size()+"' items.");
+                Log.info("Recursos carregados: " + targetMap.size() + " itens (" + filePath + ").");
             } catch (IOException e) {
-                // Log.error
-                Log.error("ERRO NIO ao ler ficheiro '" + filePath + "': " + e.getMessage()); 
+                Log.error("Falha ao ler o ficheiro '" + filePath + "': " + e.getMessage());
                 return false;
             }
         } else {
-            // Log.warn
-            Log.warn("... FALHOU (Não Encontrado/Legível)."); 
+            Log.warn("Ficheiro de recursos não encontrado ou inacessível: " + filePath);
             return false;
         }
         return true;
     }
-    
-    /** 🔄 Lógica central de leitura de linhas a partir de um BufferedReader. */
+
+    /**
+     * Processa o conteúdo do buffer e preenche o mapa.
+     * Ignora linhas vazias ou comentários (#).
+     * 
+     * @param br  leitor buffered
+     * @param map mapa de destino
+     * @throws IOException erro de leitura
+     */
     private static void readFromReader(BufferedReader br, Map<String, String> map) throws IOException {
         String linha;
         while ((linha = br.readLine()) != null) {
-            if (linha.trim().isEmpty() || linha.startsWith("#")) continue; 
+            if (linha.trim().isEmpty() || linha.startsWith("#"))
+                continue;
             String[] partes = linha.split("=", 2);
             if (partes.length == 2) {
                 String chave = partes[0].trim().toLowerCase();
@@ -173,24 +189,36 @@ public class Name {
             }
         }
     }
-    
-    // ----------------------------------------------------------------------
-    // --- MÉTODOS DE MANIPULAÇÃO DE NOMES (RESTANTE LÓGICA) ---
-    // ----------------------------------------------------------------------
 
-    /** 📝 Aplica as correções ortográficas definidas no MAPA_CORR. */
+
+    // ---LÓGICA DE PROCESSAMENTO DE NOMES---
+
+
+    /**
+     * Aplica correções ortográficas conhecidas a um nome.
+     * 
+     * @param name nome original
+     * @return nome corrigido
+     */
     private static String correct(String name) {
         String[] words = SPACE_PATTERN.split(name);
         StringBuilder correctedName = new StringBuilder();
         for (int i = 0; i < words.length; i++) {
             String word = words[i];
             correctedName.append(MAPA_CORR.getOrDefault(word.toLowerCase(), word));
-            if (i < words.length - 1) correctedName.append(" ");
+            if (i < words.length - 1)
+                correctedName.append(" ");
         }
         return correctedName.toString();
     }
 
-    /** 📛 Lógica base: Realiza a abreviatura de uma palavra específica num dado índice. */
+    /**
+     * Abrevia a palavra numa posição específica.
+     * 
+     * @param name  nome completo
+     * @param index índice da palavra a abreviar
+     * @return nome com a alteração aplicada
+     */
     private static String doAbbreviate(String name, int index) {
         String[] words = SPACE_PATTERN.split(name);
         int n = words.length;
@@ -211,41 +239,58 @@ public class Name {
         } else {
             abbreviatedWord = wordToAbbreviate.charAt(0) + ".";
         }
-        
+
         newWords.set(index, abbreviatedWord);
-        
+
         return String.join(" ", newWords);
     }
-    
-    /** 👤 Determina o género a partir do primeiro nome. Retorna 'M', 'F' ou 'X'. */
+
+    /**
+     * Estima o género com base no primeiro nome.
+     * 
+     * @param full_name nome completo
+     * @return 'M' (Masculino), 'F' (Feminino) ou 'X' (Indeterminado)
+     */
     public static String getGender(String full_name) {
-        if (full_name == null || full_name.trim().isEmpty()) { return "X"; }
+        if (full_name == null || full_name.trim().isEmpty()) {
+            return "X";
+        }
         String[] words = SPACE_PATTERN.split(full_name.trim());
-        if (words.length == 0) 
-        		{ return "X"; }
+        if (words.length == 0) {
+            return "X";
+        }
         String gender = MAPA_GENERO.getOrDefault(words[0].toLowerCase(), "X");
-        if (gender.equals("X")) 
-        		gender = MAPA_GENERO.getOrDefault(correct(words[0]).toLowerCase(), "X");
+        if (gender.equals("X"))
+            gender = MAPA_GENERO.getOrDefault(correct(words[0]).toLowerCase(), "X");
         return gender;
     }
 
-    /** * ✨ **Fase 0: Normalização**. Aplica correção e capitalização. */
+    /**
+     * Normaliza a capitalização do nome.
+     * 
+     * @param name nome a normalizar
+     * @return nome normalizado (Capitalização Title Case correta)
+     */
     public static String normalize(String name) {
-        if (name == null || name.trim().isEmpty()) 
-        		{ return name; }
+        if (name == null || name.trim().isEmpty()) {
+            return name;
+        }
 
+        // Limpeza inicial: trim, minusculas, espacos duplos, apostrofos
         String normalizedName = name.trim().toLowerCase().replaceAll("\\s+", " ");
-        normalizedName = normalizedName.replaceAll("’", "'"); // Padroniza o apóstrofo
-        String correctedName = correct(normalizedName); 		// Aplica correções
+        normalizedName = normalizedName.replaceAll("’", "'");
+        String correctedName = correct(normalizedName);
 
         String[] words = SPACE_PATTERN.split(correctedName);
         StringBuilder finalName = new StringBuilder();
 
         for (int i = 0; i < words.length; i++) {
             String word = words[i];
-            if (word.isEmpty()) { continue; }
+            if (word.isEmpty()) {
+                continue;
+            }
 
-            boolean isPureConnector = (i > 0) && CONNECTORS.contains(word.toLowerCase()); 
+            boolean isPureConnector = (i > 0) && CONNECTORS.contains(word.toLowerCase());
             boolean hasApostrophe = word.contains("'");
             boolean hasHifen = word.contains("-");
 
@@ -253,25 +298,26 @@ public class Name {
 
             if (isPureConnector) {
                 processedWord = word.toLowerCase();
-            } else 
-            		if (hasApostrophe) {
-            			// Lógica de capitalização para nomes como "d'Almeida"
-            			int apostropheIndex = word.indexOf("'");
-            			String prefix = word.substring(0, apostropheIndex + 1).toLowerCase();
-            			String suffix = word.substring(apostropheIndex + 1);
-            			String capitalizedSuffix = (suffix.length() > 0) ? Character.toUpperCase(suffix.charAt(0)) + suffix.substring(1).toLowerCase() : "";
-            			processedWord = prefix + capitalizedSuffix;
-            		} 
-            		else {
-            			// Capitalização Inicial (ex: "maria-do-céu" -> "Maria-do-Céu")
-            			processedWord = Character.toUpperCase(word.charAt(0)) + word.substring(1).toLowerCase();
-            			// Capitalização com '-' (ex: "maria-do-céu" -> "Maria-do-Céu")
-            			if(hasHifen) {
-                			processedWord = processedWord.replaceAll("-", " ");
-                			processedWord = normalize(processedWord);
-                			processedWord = processedWord.replaceAll(" ", "-");
-                		}
-            		}
+            } else if (hasApostrophe) {
+                // Capitalização especial para d'Almeida, O'Connor, etc.
+                int apostropheIndex = word.indexOf("'");
+                String prefix = word.substring(0, apostropheIndex + 1).toLowerCase();
+                String suffix = word.substring(apostropheIndex + 1);
+                String capitalizedSuffix = (suffix.length() > 0)
+                        ? Character.toUpperCase(suffix.charAt(0)) + suffix.substring(1).toLowerCase()
+                        : "";
+                processedWord = prefix + capitalizedSuffix;
+            } else {
+                // Capitalização normal
+                processedWord = Character.toUpperCase(word.charAt(0)) + word.substring(1).toLowerCase();
+
+                // Tratamento de nomes compostos com hífen
+                if (hasHifen) {
+                    processedWord = processedWord.replaceAll("-", " ");
+                    processedWord = normalize(processedWord); // Recursividade simples para os componentes
+                    processedWord = processedWord.replaceAll(" ", "-");
+                }
+            }
 
             finalName.append(processedWord);
 
@@ -280,36 +326,56 @@ public class Name {
         }
         return finalName.toString();
     }
-    
-    /** * ⏭️ **Fase 1: Abrevia o Meio**. Abreviar a próxima palavra do meio (não destrutiva). */
+
+    /**
+     * Redução Fase 1: Abrevia a próxima palavra do meio elegivel.
+     * 
+     * @param name nome atual
+     * @return nome com uma palavra intermédia abreviada
+     */
     public static String abbreviateMiddle(String name) {
-        if (name == null || name.trim().isEmpty()) { return name; }
+        if (name == null || name.trim().isEmpty()) {
+            return name;
+        }
         String[] words = SPACE_PATTERN.split(name);
         int n = words.length;
 
-        if (n <= 2) { return name; }
+        if (n <= 2) {
+            return name;
+        }
 
         int wordToAbbreviateIndex = -1;
 
         for (int i = 1; i <= n - 2; i++) {
             String word = words[i];
-            if (CONNECTORS.contains(word.toLowerCase())) continue;
-            if (word.endsWith(".")) continue;
+            if (CONNECTORS.contains(word.toLowerCase()))
+                continue;
+            if (word.endsWith("."))
+                continue;
             wordToAbbreviateIndex = i;
             break;
         }
 
-        if (wordToAbbreviateIndex == -1) { return name; }
+        if (wordToAbbreviateIndex == -1) {
+            return name;
+        }
 
         return doAbbreviate(name, wordToAbbreviateIndex);
     }
 
-    /** 💣 **Fase 2: Remoção do Segmento**. Remove o próximo segmento abreviado e o conector anterior (destrutiva). */
+    /**
+     * Redução Fase 2: Remove segmentos já abreviados.
+     * 
+     * @param name nome atual
+     * @return nome sem o segmento abreviado
+     */
     private static String stripSegment(String name) {
         String[] words = SPACE_PATTERN.split(name);
         List<String> newWords = new ArrayList<>(Arrays.asList(words));
         int n = newWords.size();
-        if (n <= 2) { return name; }
+        if (n <= 2) {
+            return name;
+        }
         int indexToRemove = -1;
 
         for (int i = 1; i <= n - 2; i++) {
@@ -319,9 +385,11 @@ public class Name {
             }
         }
 
-        if (indexToRemove == -1) { return name; }
+        if (indexToRemove == -1) {
+            return name;
+        }
 
-        newWords.remove(indexToRemove); 
+        newWords.remove(indexToRemove);
 
         if (indexToRemove > 0) {
             String previousWord = newWords.get(indexToRemove - 1);
@@ -332,17 +400,22 @@ public class Name {
         return String.join(" ", newWords);
     }
 
-    /** 💥 **Fase 3: Remoção Imutável**. Remove prioritariamente Conectores e Palavras Intermédias inteiras. */
+    /**
+     * Redução Fase 3: Remoção de conectores e palavras intermédias inteiras.
+     * 
+     * @param name nome atual
+     * @return nome reduzido
+     */
     private static String stripImmutable(String name) {
         String[] words = SPACE_PATTERN.split(name);
         List<String> newWords = new ArrayList<>(Arrays.asList(words));
         int n = newWords.size();
 
         if (n <= 2) {
-             return name;
+            return name;
         }
 
-        // 1. Prioridade: Conectores no meio
+        // 1. Remover conectores intermédios (ordem inversa)
         for (int i = newWords.size() - 1; i > 0; i--) {
             String word = newWords.get(i);
             if (CONNECTORS.contains(word.toLowerCase())) {
@@ -351,7 +424,7 @@ public class Name {
             }
         }
 
-        // 2. Prioridade: Palavra inteira do meio
+        // 2. Remover palavras intermédias inteiras
         for (int i = 1; i < newWords.size() - 1; i++) {
             String word = newWords.get(i);
             if (!CONNECTORS.contains(word.toLowerCase()) && !word.endsWith(".")) {
@@ -360,7 +433,7 @@ public class Name {
             }
         }
 
-        // 3. Últimos recursos: Remover palavras nas extremidades
+        // 3. Remover palavras nas extremidades (último recurso)
         int lastIndex = newWords.size() - 1;
         String lastWord = newWords.get(lastIndex);
 
@@ -369,7 +442,7 @@ public class Name {
             return String.join(" ", newWords);
         }
 
-         if (newWords.size() > 1) {
+        if (newWords.size() > 1) {
             String firstWord = newWords.get(0);
             if (!firstWord.endsWith(".") && !CONNECTORS.contains(firstWord.toLowerCase())) {
                 newWords.remove(0);
@@ -380,107 +453,109 @@ public class Name {
         return name;
     }
 
-    /** 📛 **Fase 4: Abrevia o Primeiro Nome**. Abrevia o primeiro nome como último recurso. */
+    /**
+     * Redução Fase 4: Abrevia o primeiro nome.
+     */
     private static String abbreviateFirst(String name) {
         return doAbbreviate(name, 0);
     }
 
-    /** ✂️ **Fase 5: Abrevia o Último Nome**, (apelido) de um nome completo.*/
+    /**
+     * Redução Fase 5: Abrevia o último nome (apelido).
+     */
     public static String abbreviateLast(String name) {
         return doAbbreviate(name, name.split(" ").length - 1);
     }
+
     /**
-     * ✂️ **Reduz o tamanho de um nome** (`shorten`) em quatro fases progressivas.
+     * Reduz o nome para caber num tamanho máximo, aplicando várias estratégias em
+     * sequência.
+     * 
+     * @param name    nome original
+     * @param maxSize tamanho máximo permitido
+     * @return nome reduzido
      */
     public static String shorten(String name, int maxSize) {
         String currentName = normalize(name);
-        if (currentName == null || currentName.isEmpty() || currentName.length() <= maxSize) 
-        		{ return currentName; }
+        if (currentName == null || currentName.isEmpty() || currentName.length() <= maxSize) {
+            return currentName;
+        }
 
-        // Fase 1: Abrevia Progressivamente as Palavras Intermédias
+        // Fase 1: Abreviação intermédia
         String previousName = "";
         while (currentName.length() > maxSize && !currentName.equals(previousName)) {
-        	 	// Log.info("  ▶️ Fase 1️: Abrevia Progressivamente as Palavras Intermédias");
             previousName = currentName;
             currentName = abbreviateMiddle(currentName);
         }
 
-        // Fase 2: Remoção Progressiva de Segmentos Abreviados (ex: 'F. da')
+        // Fase 2: Remoção de segmentos abreviados
         if (currentName.length() > maxSize) {
-            // Log.info("  ▶️ Fase 2: Remoção Progressiva de Segmentos Abreviados");
             previousName = "";
             while (currentName.length() > maxSize && !currentName.equals(previousName)) {
                 previousName = currentName;
                 currentName = stripSegment(currentName);
             }
         }
-        // Fase 3: Remoção Progressiva de Conectores e Palavras Inteiras Imutáveis
+        // Fase 3: Remoção de conectores
         if (currentName.length() > maxSize) {
-             // Log.info("  ▶️ Fase 3: Remoção Agressiva de Conectores e Palavras Inteiras Imutáveis");
-             previousName = "";
-             while (currentName.length() > maxSize && !currentName.equals(previousName)) {
+            previousName = "";
+            while (currentName.length() > maxSize && !currentName.equals(previousName)) {
                 previousName = currentName;
                 String nextName = stripImmutable(currentName);
-
                 if (currentName.equals(nextName)) {
-                    break; 
+                    break;
                 }
                 currentName = nextName;
             }
         }
-        
-        // Fase 4: Abrevia o Primeiro Nome
+
+        // Fase 4: Abreviação do primeiro nome
         if (currentName.length() > maxSize) {
-        		// Log.info("  ▶️ Fase 4: Abrevia o Primeiro Nome");
             currentName = abbreviateFirst(currentName);
         }
-        
-        // Fase 5: Abrevia o Ultimo Nome
+
+        // Fase 5: Abreviação do último nome
         if (currentName.length() > maxSize) {
-        		// Log.info("  ▶️ Fase 5: Abrevia o Ultimo Nome");
             currentName = abbreviateLast(currentName);
         }
-        
-        
-        // Fase 6: Reduz a duas letras
+
+        // Fase 6: Redução drástica para iniciais
         if (currentName.length() > maxSize) {
-        		// Log.info("  ▶️ Fase 6: Reduz a duas letras!");
-            currentName = currentName.replaceAll("[ .]", "");;
+            currentName = currentName.replaceAll("[ .]", "");
         }
-        
+
         return currentName;
     }
 
-    // ----------------------------------------------------------------------
-    // 💻 MÉTODO MAIN DE TESTE (Para uso em Consola/IDE)
-    // ----------------------------------------------------------------------
-
+    /**
+     * Método de teste para execução local (Consola/IDE).
+     */
     public static void main(String[] args) {
 
-        Log.info("--- 🚀 Teste Name.java em modo CONSOLA/IDE ---"); 
-        
-        // Nomes de teste
+        Log.info("--- Teste Local Name.java ---");
+
+        // Casos de teste
         String nomeOriginal = "Maria-Do-ceu Benedita Frôscolo Jovino D'Almeida MILITÃO De Sousa Baruel Dos Itaparica Boré SALVE-rainha Das abelhas";
         String nomeF = "Capitulina andrioleta da Conceicao do Corte-geral";
         String nomeM = "Joao-de-Deus acacio Techeremunga texugeiro";
         String nomeX = "Manarimba Bupatcha Medronheira";
-        
-        System.out.println("\n--- 🔎 Normalização ---"); 
+
+        System.out.println("\n--- Normalização ---");
         String nomeNormalizado = normalize(nomeOriginal);
         System.out.println("Original: " + nomeOriginal);
         System.out.println("Normalizado: " + nomeNormalizado);
-        System.out.println("Tamanho Inicial: " + nomeNormalizado.length() + " caracteres.");
+        System.out.println("Comprimento: " + nomeNormalizado.length());
 
-        System.out.println("\n" + "--- ✂️ Testes de Redução do Comprimento do Nome ---");
-        for(int i=99; i>1; i=i-5) {
-        		String resultado = shorten(nomeOriginal, i);
-        		System.out.println("Limie Máximo "+i+": '" + resultado +"' (Comprimento Atual: " + resultado.length() + ")"); 
+        System.out.println("\n--- Testes de Redução ---");
+        for (int i = 99; i > 1; i = i - 5) {
+            String resultado = shorten(nomeOriginal, i);
+            System.out.println("Max " + i + ": '" + resultado + "' (Len: " + resultado.length() + ")");
         }
 
-        System.out.println("\n" + "--- 👤 Teste de Determinação de Género ---");
-        System.out.println("Nome: " + normalize(nomeOriginal).substring(0,20) 	+ "... -> Género: " + getGender(nomeOriginal));
-        System.out.println("Nome: " + normalize(nomeF).substring(0,20) 	+ "... -> Género: " + getGender(nomeF));
-        System.out.println("Nome: " + normalize(nomeM).substring(0,20) 	+ "... -> Género: " + getGender(nomeM));
-        System.out.println("Nome: " + normalize(nomeX).substring(0,20) 	+ "... -> Género: " + getGender(nomeX));
+        System.out.println("\n--- Género ---");
+        System.out.println("1: " + getGender(nomeOriginal));
+        System.out.println("2: " + getGender(nomeF));
+        System.out.println("3: " + getGender(nomeM));
+        System.out.println("4: " + getGender(nomeX));
     }
 }

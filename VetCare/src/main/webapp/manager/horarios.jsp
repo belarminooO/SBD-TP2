@@ -1,4 +1,8 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%--
+    Gestão de escalas e horários dos veterinários.
+    Permite atribuir turnos e serviços específicos a cada médico, prevenindo conflitos de agendamento.
+--%>
 <%@ page import="java.util.*" %>
 <%@ page import="manager.EscalonamentoDAO" %>
 <%@ page import="clinica.*" %>
@@ -23,7 +27,7 @@
     </div>
 
     <div class="container">
-        
+
         <div class="card">
             <h2>4.2 Atribuir Supervisão (Veterinários)</h2>
             <form action="manager" method="post">
@@ -60,7 +64,7 @@
                 </div>
             </form>
         </div>
-        
+
         <div class="card">
             <h3>Horários Atribuídos</h3>
             <table>

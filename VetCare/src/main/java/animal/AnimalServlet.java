@@ -14,9 +14,11 @@ import cliente.ClienteDAO;
 public class AnimalServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
 
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         String action = request.getParameter("p");
-        if (action == null) action = "list";
+        if (action == null)
+            action = "list";
 
         if ("edit".equals(action)) {
             showEditForm(request, response);
@@ -39,7 +41,8 @@ public class AnimalServlet extends HttpServlet {
         }
     }
 
-    private void showEditForm(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    private void showEditForm(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         String id = request.getParameter("id");
         if (id != null) {
             request.setAttribute("animal", AnimalDAO.getById(Integer.parseInt(id)));
@@ -49,7 +52,8 @@ public class AnimalServlet extends HttpServlet {
         request.getRequestDispatcher("animal/edita.jsp").forward(request, response);
     }
 
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         Animal a = new Animal(request);
         AnimalDAO.save(a);
         response.sendRedirect("animais");

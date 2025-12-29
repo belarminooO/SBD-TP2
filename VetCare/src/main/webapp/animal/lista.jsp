@@ -1,4 +1,8 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%--
+    Listagem geral de animais registados.
+    Permite pesquisar por tutor e aceder às fichas de edição, genealogia e histórico.
+--%>
 <%@ page import="java.util.List" %>
 <%@ page import="animal.Animal" %>
 <%@ page import="cliente.Cliente" %>
@@ -31,22 +35,21 @@
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                 <h2>Lista de Animais</h2>
                 <div style="display:flex; gap:10px;">
-                    <!-- Req 2.1: Autocomplete control -->
                     <form action="animais" method="get" style="display:flex;">
                         <input type="text" name="search" list="tutoresList" placeholder="Pesquisar por Tutor..." style="padding:5px;">
                         <datalist id="tutoresList">
-                            <% 
+                            <%
                             List<Cliente> allClients = ClienteDAO.getAll();
                             if(allClients!=null) for(Cliente c : allClients) { %>
                                 <option value="<%= c.getNomeCompleto() %>">
                             <% } %>
                         </datalist>
-                        <button type="submit" class="btn btn-sm btn-secondary" style="margin-left:5px;">🔍</button>
+                        <button type="submit" class="btn btn-sm btn-secondary" style="margin-left:5px;">Pesquisar</button>
                     </form>
                     <a href="animais?p=edit" class="btn btn-primary">+ Novo Animal</a>
                 </div>
             </div>
-            
+
             <table>
                 <thead>
                     <tr>
@@ -73,11 +76,11 @@
                         <td><%= a.getClienteNif() %></td>
                         <td>
                             <a href="animais?p=edit&id=<%= a.getIdAnimal() %>" class="btn btn-sm">Editar</a>
-                            <a href="animais?p=genealogia&id=<%= a.getIdAnimal() %>" class="btn btn-sm btn-secondary">🧬 Genealogia</a>
+                            <a href="animais?p=genealogia&id=<%= a.getIdAnimal() %>" class="btn btn-sm btn-secondary">Genealogia</a>
                             <a href="historico?idAnimal=<%= a.getIdAnimal() %>" class="btn btn-sm btn-secondary">Histórico</a>
                         </td>
                     </tr>
-                    <% 
+                    <%
                         }
                     } else {
                     %>

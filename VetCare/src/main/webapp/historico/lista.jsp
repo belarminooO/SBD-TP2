@@ -1,5 +1,8 @@
-<%@ page language="java" contentType="text/html; charset=UTF-8"
-pageEncoding="UTF-8"%>
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%--
+    Histórico clínico do animal (Timeline).
+    Exibe uma lista unificada de eventos médicos (consultas, cirurgias, vacinas) ordenados cronologicamente.
+--%>
 <!DOCTYPE html>
 <html>
   <head>
@@ -24,8 +27,9 @@ pageEncoding="UTF-8"%>
 </div>
 
 <div class="container">
-  <% 
-    Animal a = (Animal) request.getAttribute("animal"); 
+  <%
+    //  HYDRATION: Recupera o objeto Animal e a lista de eventos (Maps) do pedido HTTP.
+    Animal a = (Animal) request.getAttribute("animal");
     List<Map<String, Object>> historia = (List<Map<String, Object>>) request.getAttribute("historia");
     if (a != null) {
   %>

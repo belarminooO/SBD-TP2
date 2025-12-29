@@ -8,22 +8,38 @@ import java.util.ArrayList;
 import java.util.List;
 import util.Configura;
 
+/**
+ * Responsável por todas as operações de persistência relacionadas à entidade
+ * Animal.
+ * Atua como intermediário entre o modelo de objetos Java e a base de dados
+ * relacional,
+ * isolando a lógica de acesso a dados.
+ */
 public class AnimalDAO {
 
+    /**
+     * Efetua a gravação ou atualização de um registo de animal.
+     * Determina automaticamente se deve realizar uma inserção ou uma
+     * atualização com base na existência de um identificador válido.
+     * 
+     * @param a Objeto animal a ser persistido.
+     * @return Número de registos afetados ou -1 em caso de erro.
+     */
     public static int save(Animal a) {
-        if (a == null || !a.valid()) return -1;
-        
-        // If ID exists, it's an update
+        if (a == null || !a.valid())
+            return -1;
+
         if (a.getIdAnimal() != null && a.getIdAnimal() > 0) {
             return update(a);
         }
 
-        String sql = "INSERT INTO Animal (Nome, Raca, Sexo, DataNascimento, Filiacao, EstadoReprodutivo, Alergias, Cores, PesoAtual, CaracteristicasDistintivas, NumeroTransponder, Fotografia, Cliente_NIF, Catalogo_NomeComum) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        
+        String sql = "INSERT INTO Animal (Nome, Raca, Sexo, DataNascimento, Filiacao, EstadoReprodutivo, Alergias, Cores, PesoAtual, CaracteristicasDistintivas, NumeroTransponder, Fotografia, Cliente_NIF, Catalogo_NomeComum) "
+                +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
         try (Connection con = new Configura().getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            
+                PreparedStatement ps = con.prepareStatement(sql)) {
+
             ps.setString(1, a.getNome());
             ps.setString(2, a.getRaca());
             ps.setString(3, a.getSexo());
@@ -38,22 +54,29 @@ public class AnimalDAO {
             ps.setString(12, a.getFotografia());
             ps.setString(13, a.getClienteNif());
             ps.setString(14, a.getCatalogoNomeComum());
-            
+
             return ps.executeUpdate();
         } catch (SQLException e) {
-            System.err.println("Erro ao gravar Animal: " + e.getMessage());
+            System.err.println("Erro ao gravar registo de Animal: " + e.getMessage());
         }
         return -1;
     }
 
+    /**
+     * Atualiza os dados de um animal existente na base de dados.
+     * 
+     * @param a Objeto animal com os dados atualizados.
+     * @return Número de registos modificados.
+     */
     public static int update(Animal a) {
-        if (a == null || !a.valid()) return -1;
-        
+        if (a == null || !a.valid())
+            return -1;
+
         String sql = "UPDATE Animal SET Nome=?, Raca=?, Sexo=?, DataNascimento=?, Filiacao=?, EstadoReprodutivo=?, Alergias=?, Cores=?, PesoAtual=?, CaracteristicasDistintivas=?, NumeroTransponder=?, Fotografia=?, Cliente_NIF=?, Catalogo_NomeComum=? WHERE IDAnimal=?";
-        
+
         try (Connection con = new Configura().getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            
+                PreparedStatement ps = con.prepareStatement(sql)) {
+
             ps.setString(1, a.getNome());
             ps.setString(2, a.getRaca());
             ps.setString(3, a.getSexo());
@@ -69,91 +92,129 @@ public class AnimalDAO {
             ps.setString(13, a.getClienteNif());
             ps.setString(14, a.getCatalogoNomeComum());
             ps.setInt(15, a.getIdAnimal());
-            
+
             return ps.executeUpdate();
         } catch (SQLException e) {
-            System.err.println("Erro ao atualizar Animal: " + e.getMessage());
+            System.err.println("Erro ao atualizar registo de Animal: " + e.getMessage());
         }
         return -1;
     }
 
+    /**
+     * Recupera a lista completa de animais registados.
+     * Realiza a junção com o catálogo biológico para obter dados de longevidade.
+     * 
+     * @return Lista de objetos Animal.
+     */
     public static List<Animal> getAll() {
         List<Animal> list = new ArrayList<>();
         String sql = "SELECT a.*, c.ExpectativaVida FROM Animal a " +
-                     "LEFT JOIN Catalogo c ON a.Catalogo_NomeComum = c.NomeComum " +
-                     "ORDER BY a.Nome";
+                "LEFT JOIN Catalogo c ON a.Catalogo_NomeComum = c.NomeComum " +
+                "ORDER BY a.Nome";
         try (Connection con = new Configura().getConnection();
-             PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) list.add(new Animal(rs));
+                PreparedStatement ps = con.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()) {
+            while (rs.next())
+                list.add(new Animal(rs));
         } catch (SQLException e) {
-            System.err.println("Erro ao listar Animais: " + e.getMessage());
+            System.err.println("Erro ao listar animais: " + e.getMessage());
         }
         return list;
     }
-    
+
+    /**
+     * Recupera as espécies configuradas no catálogo biológico de referência.
+     * 
+     * @return Lista de objetos descrevendo as espécies.
+     */
     public static List<Catalogo> getEspecies() {
         List<Catalogo> list = new ArrayList<>();
         String sql = "SELECT * FROM Catalogo ORDER BY NomeComum";
         try (Connection con = new Configura().getConnection();
-             PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) list.add(new Catalogo(rs));
+                PreparedStatement ps = con.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Catalogo c = new Catalogo();
+                c.setNomeComum(rs.getString("NomeComum"));
+                c.setNomeCientifico(rs.getString("NomeCientifico"));
+                c.setExpectativaVida(rs.getInt("ExpectativaVida"));
+                c.setPesoAdulto(rs.getBigDecimal("PesoAdulto"));
+                list.add(c);
+            }
         } catch (SQLException e) {
-            System.err.println("Erro ao listar especies: " + e.getMessage());
+            System.err.println("Erro ao listar catálogo de espécies: " + e.getMessage());
         }
         return list;
     }
+
+    /**
+     * Obtém um animal específico através do seu identificador único.
+     * 
+     * @param id Identificador do animal.
+     * @return Objeto Animal ou nulo se não for encontrado.
+     */
     public static Animal getById(int id) {
         String sql = "SELECT a.*, c.ExpectativaVida FROM Animal a " +
-                     "JOIN Catalogo c ON a.Catalogo_NomeComum = c.NomeComum " +
-                     "WHERE a.IDAnimal = ?";
+                "JOIN Catalogo c ON a.Catalogo_NomeComum = c.NomeComum " +
+                "WHERE a.IDAnimal = ?";
         try (Connection con = new Configura().getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
+                PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    Animal a = new Animal(rs);
-                    // We can set the expectation if we add the field
-                    return a;
+                    return new Animal(rs);
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Erro ao ler Animal por ID: " + e.getMessage());
+            System.err.println("Erro ao recuperar animal por identificador: " + e.getMessage());
         }
         return null;
     }
 
+    /**
+     * Pesquisa animais associados a um tutor através do nome deste.
+     * 
+     * @param tutorName Nome ou parte do nome do tutor.
+     * @return Lista de animais encontrados.
+     */
     public static List<Animal> searchByTutor(String tutorName) {
         List<Animal> list = new ArrayList<>();
         String sql = "SELECT a.*, cat.ExpectativaVida FROM Animal a " +
-                     "JOIN Cliente c ON a.Cliente_NIF = c.NIF " +
-                     "LEFT JOIN Catalogo cat ON a.Catalogo_NomeComum = cat.NomeComum " +
-                     "WHERE c.NomeCompleto LIKE ? ORDER BY a.Nome";
+                "JOIN Cliente c ON a.Cliente_NIF = c.NIF " +
+                "LEFT JOIN Catalogo cat ON a.Catalogo_NomeComum = cat.NomeComum " +
+                "WHERE c.NomeCompleto LIKE ? ORDER BY a.Nome";
         try (Connection con = new Configura().getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
+                PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, "%" + tutorName + "%");
             try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) list.add(new Animal(rs));
+                while (rs.next())
+                    list.add(new Animal(rs));
             }
         } catch (SQLException e) {
-            System.err.println("Erro ao pesquisar animais: " + e.getMessage());
+            System.err.println("Erro na pesquisa de animais por tutor: " + e.getMessage());
         }
         return list;
     }
-    
+
+    /**
+     * Localiza um animal através do número do microchip.
+     * 
+     * @param transponder Código do transponder eletrónico.
+     * @return Objeto Animal correspondente.
+     */
     public static Animal getByTransponder(String transponder) {
         String sql = "SELECT a.*, c.ExpectativaVida FROM Animal a " +
-                     "JOIN Catalogo c ON a.Catalogo_NomeComum = c.NomeComum " +
-                     "WHERE a.NumeroTransponder = ?";
+                "JOIN Catalogo c ON a.Catalogo_NomeComum = c.NomeComum " +
+                "WHERE a.NumeroTransponder = ?";
         try (Connection con = new Configura().getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
+                PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, transponder);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return new Animal(rs);
+                if (rs.next())
+                    return new Animal(rs);
             }
         } catch (SQLException e) {
-            System.err.println("Erro ao ler Animal por transponder: " + e.getMessage());
+            System.err.println("Erro na localização por transponder: " + e.getMessage());
         }
         return null;
     }
