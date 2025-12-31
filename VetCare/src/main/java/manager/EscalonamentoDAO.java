@@ -33,6 +33,7 @@ public class EscalonamentoDAO {
         public String servicoNome;
         /** Nome do médico veterinário alocado. */
         public String vetNome;
+        public String clinica; // Added field
     }
 
     /**
@@ -87,6 +88,7 @@ public class EscalonamentoDAO {
                 }
             }
         } catch (SQLException e) {
+            e.printStackTrace(); // Added debug
             System.err.println("Erro ao validar sobreposição: " + e.getMessage());
         }
 
@@ -97,6 +99,7 @@ public class EscalonamentoDAO {
             ps.setInt(2, idServico);
             ps.executeUpdate();
         } catch (SQLException e) {
+            e.printStackTrace(); // Added debug
             // Ignora erro se não existir registo prévio para remover
         }
 
@@ -108,6 +111,7 @@ public class EscalonamentoDAO {
             ps.setString(3, nLicenca);
             return ps.executeUpdate();
         } catch (SQLException e) {
+            e.printStackTrace(); // Added debug
             System.err.println("Erro ao gravar escalonamento: " + e.getMessage());
         }
         return -1;
@@ -120,12 +124,13 @@ public class EscalonamentoDAO {
      */
     public static List<Escala> getAll() {
         List<Escala> list = new ArrayList<>();
-        String sql = "SELECT e.*, h.DiaSemana, h.HoraInicio, ts.Nome as Servico, v.Nome as Vet " +
+        String sql = "SELECT e.*, h.DiaSemana, h.HoraInicio, c.Localidade, ts.Nome as Servico, v.Nome as Vet " +
                 "FROM Escalonamento e " +
                 "JOIN Horario h ON e.IDHorario = h.IDHorario " +
+                "JOIN Clinica c ON h.Clinica_IDClinica = c.IDClinica " + // Added join
                 "JOIN TipoServico ts ON e.IDServico = ts.IDServico " +
                 "JOIN Veterinario v ON e.NLicenca = v.NLicenca " +
-                "ORDER BY h.DiaSemana";
+                "ORDER BY c.Localidade, h.DiaSemana"; // Ordered by clinic too
         try (Connection con = new Configura().getConnection();
                 PreparedStatement ps = con.prepareStatement(sql);
                 ResultSet rs = ps.executeQuery()) {
@@ -136,6 +141,7 @@ public class EscalonamentoDAO {
                 es.nLicenca = rs.getString("NLicenca");
                 es.dia = rs.getString("DiaSemana");
                 es.hora = rs.getTime("HoraInicio").toString();
+                es.clinica = rs.getString("Localidade"); // Added field
                 es.servicoNome = rs.getString("Servico");
                 es.vetNome = rs.getString("Vet");
                 list.add(es);
@@ -144,5 +150,109 @@ public class EscalonamentoDAO {
             System.err.println("Erro ao listar escalonamento: " + e.getMessage());
         }
         return list;
+    }
+
+    /**
+     * Atualiza uma atribuição de escala, garantindo integridade transacional.
+     * Remove o registo antigo e insere o novo. Se houver conflito, reverte a
+     * operação.
+     * 
+     * @param oldHorario ID do horário original.
+     * @param oldServico ID do serviço original.
+     * @param newHorario Novo ID de horário.
+     * @param newServico Novo ID de serviço.
+     * @param nLicenca   Licença do veterinário.
+     * @return 1 (Sucesso), -2 (Sobreposição), -1 (Erro).
+     */
+    public static int update(int oldHorario, int oldServico, int newHorario, int newServico, String nLicenca) {
+        Connection con = null;
+        try {
+            con = new Configura().getConnection();
+            con.setAutoCommit(false);
+
+            // 1. Remover o antigo (libertar o slot para validação)
+            String sqlDel = "DELETE FROM Escalonamento WHERE IDHorario=? AND IDServico=?";
+            try (PreparedStatement ps = con.prepareStatement(sqlDel)) {
+                ps.setInt(1, oldHorario);
+                ps.setInt(2, oldServico);
+                ps.executeUpdate();
+            }
+
+            // 2. Verificar conflitos para o novo (Lógica replicada de atribuir)
+            // Primeiro obter detalhes do horário alvo
+            String sqlTarget = "SELECT DiaSemana, HoraInicio, HoraFim FROM Horario WHERE IDHorario = ?";
+            String diaTarget = "";
+            java.sql.Time inicioTarget = null;
+            java.sql.Time fimTarget = null;
+
+            try (PreparedStatement ps = con.prepareStatement(sqlTarget)) {
+                ps.setInt(1, newHorario);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        diaTarget = rs.getString("DiaSemana");
+                        inicioTarget = rs.getTime("HoraInicio");
+                        fimTarget = rs.getTime("HoraFim");
+                    }
+                }
+            }
+
+            // Verificar sobreposição
+            String sqlCheck = "SELECT COUNT(*) FROM Escalonamento e " +
+                    "JOIN Horario h ON e.IDHorario = h.IDHorario " +
+                    "WHERE e.NLicenca = ? AND h.DiaSemana = ? " +
+                    "AND (h.HoraInicio < ? AND h.HoraFim > ?) " +
+                    "AND (e.IDHorario <> ? OR e.IDServico <> ?)";
+
+            boolean conflict = false;
+            try (PreparedStatement ps = con.prepareStatement(sqlCheck)) {
+                ps.setString(1, nLicenca);
+                ps.setString(2, diaTarget);
+                ps.setTime(3, fimTarget);
+                ps.setTime(4, inicioTarget);
+                ps.setInt(5, newHorario);
+                ps.setInt(6, newServico);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next() && rs.getInt(1) > 0)
+                        conflict = true;
+                }
+            }
+
+            if (conflict) {
+                con.rollback();
+                return -2;
+            }
+
+            // 3. Inserir o novo
+            String sqlIns = "INSERT INTO Escalonamento (IDHorario, IDServico, NLicenca) VALUES (?, ?, ?)";
+            try (PreparedStatement ps = con.prepareStatement(sqlIns)) {
+                ps.setInt(1, newHorario);
+                ps.setInt(2, newServico);
+                ps.setString(3, nLicenca);
+                ps.executeUpdate();
+            }
+
+            con.commit();
+            return 1;
+
+        } catch (SQLException e) {
+            System.err.println("Erro no update de escala: " + e.getMessage());
+            if (con != null) {
+                try {
+                    con.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            return -1;
+        } finally {
+            if (con != null) {
+                try {
+                    con.setAutoCommit(true);
+                    con.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 }

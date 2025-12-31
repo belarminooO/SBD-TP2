@@ -46,7 +46,38 @@ public class ManagerServlet extends HttpServlet {
             request.setAttribute("listaEscalas", EscalonamentoDAO.getAll());
             request.setAttribute("listaVets", veterinario.VeterinarioDAO.getAll());
             request.setAttribute("listaTipos", agendamento.AgendamentoDAO.getTiposServico());
-            request.setAttribute("listaHorarios", agendamento.AgendamentoDAO.getAllHorarios());
+
+            // 1. Get All Clinics for the dropdown
+            java.util.List<clinica.Clinica> todasClinicas = clinica.ClinicaDAO.getAll();
+            request.setAttribute("listaClinicas", todasClinicas);
+
+            // 2. Determine Selected Clinic (Default to first one if not set)
+            int selectedClinicaId = -1;
+            String filterStr = request.getParameter("filterClinica");
+            if (filterStr != null && !filterStr.isEmpty()) {
+                try {
+                    selectedClinicaId = Integer.parseInt(filterStr);
+                } catch (Exception e) {
+                }
+            } else if (!todasClinicas.isEmpty()) {
+                selectedClinicaId = todasClinicas.get(0).getIdClinica();
+            }
+            request.setAttribute("selectedClinicaId", selectedClinicaId);
+
+            // 3. Filter Schedules for that clinic
+            // Use correct type clinica.Horario explicitly
+            java.util.List<clinica.Horario> allHorarios = agendamento.AgendamentoDAO.getAllHorarios();
+            java.util.List<clinica.Horario> filteredHorarios = new java.util.ArrayList<>();
+
+            if (allHorarios != null) {
+                for (clinica.Horario h : allHorarios) {
+                    if (h.getClinicaId() == selectedClinicaId) {
+                        filteredHorarios.add(h);
+                    }
+                }
+            }
+            request.setAttribute("listaHorarios", filteredHorarios);
+
             request.getRequestDispatcher("manager/horarios.jsp").forward(request, response);
         } else if ("xml".equals(action)) {
             exportFullProfile(request, response, "xml");
@@ -122,8 +153,29 @@ public class ManagerServlet extends HttpServlet {
             int idHorario = Integer.parseInt(request.getParameter("IDHorario"));
             int idServico = Integer.parseInt(request.getParameter("IDServico"));
             String nLicenca = request.getParameter("NLicenca");
-            EscalonamentoDAO.atribuir(idHorario, idServico, nLicenca);
-            response.sendRedirect("manager?p=horarios");
+
+            String oldH = request.getParameter("oldIDHorario");
+            String oldS = request.getParameter("oldIDServico");
+
+            int result = 0;
+            if (oldH != null && !oldH.isEmpty() && oldS != null && !oldS.isEmpty()) {
+                // É uma atualização
+                result = EscalonamentoDAO.update(Integer.parseInt(oldH), Integer.parseInt(oldS), idHorario, idServico,
+                        nLicenca);
+            } else {
+                // É uma nova atribuição
+                result = EscalonamentoDAO.atribuir(idHorario, idServico, nLicenca);
+            }
+
+            String msg = "";
+            if (result == 1)
+                msg = "Operação realizada com sucesso.";
+            else if (result == -2)
+                msg = "Erro: Sobreposição de horário detetada para este veterinário.";
+            else
+                msg = "Erro técnico na operação.";
+
+            response.sendRedirect("manager?p=horarios&msg=" + java.net.URLEncoder.encode(msg, "UTF-8"));
         }
     }
 }

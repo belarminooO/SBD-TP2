@@ -1,0 +1,24 @@
+[
+  {
+    "NIF": "999000333",
+    "NomeCompleto": "Maria Teste JSON",
+    "Contactos": "930000003",
+    "Morada": "Praceta dos Dados 3",
+    "Distrito": "Braga",
+    "Concelho": "Braga",
+    "Freguesia": "Maximinos",
+    "PreferenciasLinguisticas": "fr-FR",
+    "TipoCliente": "Pessoa"
+  },
+  {
+    "NIF": "999000444",
+    "NomeCompleto": "Tech Solutions Teste SA",
+    "Contactos": "220000004",
+    "Morada": "Zona Industrial Lote 4",
+    "Distrito": "Aveiro",
+    "Concelho": "Aveiro",
+    "Freguesia": "Esgueira",
+    "PreferenciasLinguisticas": "pt-PT",
+    "TipoCliente": "Empresa"
+  }
+]

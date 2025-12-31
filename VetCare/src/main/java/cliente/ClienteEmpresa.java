@@ -53,6 +53,7 @@ public class ClienteEmpresa extends Cliente {
         }
     }
 
+    // --- Getters e Setters específicos ---
 
     /** @return O capital social da empresa. */
     public BigDecimal getCapitalSocial() {

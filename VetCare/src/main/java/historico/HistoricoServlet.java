@@ -68,6 +68,7 @@ public class HistoricoServlet extends HttpServlet {
 
         request.setAttribute("animal", animal);
         request.setAttribute("historia", historia);
+        request.setAttribute("agendamentosFuturos", AgendamentoDAO.getFutureAppointments(idAnimal));
 
         request.getRequestDispatcher("historico/lista.jsp").forward(request, response);
     }

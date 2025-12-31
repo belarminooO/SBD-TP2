@@ -96,8 +96,18 @@ public class Horario {
         this.clinicaId = clinicaId;
     }
 
+    private String clinicaNome; // Temp field for display
+
+    public void setClinicaNome(String nome) {
+        this.clinicaNome = nome;
+    }
+
+    public String getClinicaNome() {
+        return clinicaNome;
+    }
+
     @Override
     public String toString() {
-        return diaSemana + ": " + horaInicio + " - " + horaFim;
+        return (clinicaNome != null ? clinicaNome + " - " : "") + diaSemana + ": " + horaInicio + " - " + horaFim;
     }
 }

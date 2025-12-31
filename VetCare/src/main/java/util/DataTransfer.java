@@ -1706,12 +1706,34 @@ public final class DataTransfer {
             a.setCatalogoNomeComum(getTagValue("catalogo", infoElem));
             a.setClienteNif(getTagValue("tutor_nif", infoElem));
 
+            // Fix: Parse 'peso' for validation (required by Animal.valid())
+            String pesoStr = getTagValue("peso", infoElem);
+            if (pesoStr != null && !pesoStr.isEmpty()) {
+                a.setPesoAtual(new java.math.BigDecimal(pesoStr));
+            } else {
+                a.setPesoAtual(java.math.BigDecimal.ZERO);
+            }
+
+            // Optional fields
+            a.setAlergias(getTagValue("alergias", infoElem));
+            a.setCores(getTagValue("cores", infoElem));
+            a.setFotografia(getTagValue("fotografia", infoElem));
+            a.setEstadoReprodutivo(getTagValue("estado_reprodutivo", infoElem));
+            a.setCaracteristicasDistintivas(getTagValue("caracteristicas", infoElem));
+
             int animalId;
             if (isNew) {
                 animalId = AnimalDAO.save(a);
             } else {
                 AnimalDAO.update(a);
                 animalId = a.getIdAnimal();
+            }
+
+            // Fix: Check if persistence failed
+            if (animalId <= 0) {
+                System.err.println(
+                        "Erro: Falha ao persistir Animal (ID inválido) via XML. Verifique se o NIF do tutor existe.");
+                return false;
             }
 
             NodeList historyList = doc.getElementsByTagName("record");
@@ -1724,7 +1746,10 @@ public final class DataTransfer {
                     ps.setTipoDiscriminador(getTagValue("tipo", recordElem));
                     String valDh = getTagValue("datahora", recordElem);
                     if (valDh != null) {
-                        ps.setDataHora(java.sql.Timestamp.valueOf(valDh.replace("T", " ")));
+                        try {
+                            ps.setDataHora(java.sql.Timestamp.valueOf(valDh.replace("T", " ")));
+                        } catch (Exception ex) {
+                        }
                     }
                     ps.setDetalhesGerais(getTagValue("detalhes", recordElem));
                     ps.setTipoServicoId(1);
@@ -1734,6 +1759,7 @@ public final class DataTransfer {
             return true;
         } catch (Exception e) {
             System.err.println("Erro na importação XML de Perfil: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
@@ -1749,12 +1775,19 @@ public final class DataTransfer {
         try {
             JSONObject root = new JSONObject(jsonStr);
             JSONObject info = root.getJSONObject("info");
-            String transponder = info.getString("transponder");
-            Animal a = AnimalDAO.getByTransponder(transponder);
+            String transponder = info.optString("transponder"); // Changed from getString to optString to avoid crash
+
+            Animal a = null;
+            if (transponder != null && !transponder.isEmpty()) {
+                a = AnimalDAO.getByTransponder(transponder);
+            }
+
             boolean isNew = (a == null);
             if (isNew) {
                 a = new Animal();
-                a.setNumeroTransponder(transponder);
+                if (transponder != null && !transponder.isEmpty()) {
+                    a.setNumeroTransponder(transponder);
+                }
             }
 
             a.setNome(info.optString("nome"));
@@ -1764,12 +1797,29 @@ public final class DataTransfer {
             a.setCatalogoNomeComum(info.optString("catalogo"));
             a.setClienteNif(info.optString("tutor_nif"));
 
+            // Map missing fields
+            if (info.has("peso")) {
+                a.setPesoAtual(java.math.BigDecimal.valueOf(info.optDouble("peso")));
+            } else {
+                a.setPesoAtual(java.math.BigDecimal.ZERO);
+            }
+            a.setAlergias(info.optString("alergias"));
+            a.setCores(info.optString("cores"));
+            a.setEstadoReprodutivo(info.optString("estado_reprodutivo"));
+            a.setCaracteristicasDistintivas(info.optString("caracteristicas"));
+            a.setFotografia(info.optString("fotografia"));
+
             int animalId;
             if (isNew) {
                 animalId = AnimalDAO.save(a);
             } else {
                 AnimalDAO.update(a);
                 animalId = a.getIdAnimal();
+            }
+
+            if (animalId <= 0) {
+                System.err.println("Erro: Falha ao persistir Animal via JSON (ID inválido). Verifique NIF e Peso.");
+                return false;
             }
 
             JSONArray history = root.getJSONArray("history");
@@ -1779,8 +1829,17 @@ public final class DataTransfer {
                 ps.setAnimalId(animalId);
                 ps.setTipoDiscriminador(rec.optString("tipo", "Consulta"));
                 String dh = rec.optString("datahora");
-                if (dh != null) {
-                    ps.setDataHora(java.sql.Timestamp.valueOf(dh.replace("T", " ")));
+                if (dh != null && !dh.isEmpty()) {
+                    // Normalize date format: Replace T with space and ensure seconds differ
+                    String safeDate = dh.replace("T", " ");
+                    if (safeDate.length() == 16) { // Format yyyy-MM-dd HH:mm
+                        safeDate += ":00";
+                    }
+                    try {
+                        ps.setDataHora(java.sql.Timestamp.valueOf(safeDate));
+                    } catch (IllegalArgumentException ex) {
+                        System.err.println("Ignorando data inválida: " + safeDate);
+                    }
                 }
                 ps.setDetalhesGerais(rec.optString("detalhes"));
                 ps.setTipoServicoId(1);
@@ -1789,6 +1848,7 @@ public final class DataTransfer {
             return true;
         } catch (Exception e) {
             System.err.println("Erro na importação JSON de Perfil: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }

@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import animal.Animal;
 import animal.AnimalDAO;
 import cliente.ClienteDAO;
+import clinica.ClinicaDAO;
 
 /**
  * Controlador responsável pela gestão do agendamento de serviços clínicos.
@@ -93,6 +94,7 @@ public class AgendamentoServlet extends HttpServlet {
         request.setAttribute("listaAnimais", AnimalDAO.getAll());
         request.setAttribute("listaClientes", ClienteDAO.getAll());
         request.setAttribute("listaTipos", AgendamentoDAO.getTiposServico());
+        request.setAttribute("listaClinicas", ClinicaDAO.getAll());
 
         String idAnimal = request.getParameter("idAnimal");
         String idCliente = request.getParameter("idCliente");
@@ -133,7 +135,14 @@ public class AgendamentoServlet extends HttpServlet {
         }
 
         a.setTipoServicoId(Integer.parseInt(request.getParameter("TipoServico")));
-        a.setClinicaId(1);
+
+        // Multi-clinic support: read from form, default to 1 if missing
+        String clinicaIdStr = request.getParameter("ClinicaID");
+        if (clinicaIdStr != null && !clinicaIdStr.isEmpty()) {
+            a.setClinicaId(Integer.parseInt(clinicaIdStr));
+        } else {
+            a.setClinicaId(1);
+        }
 
         String dataStr = request.getParameter("DataHoraInicio");
         if (dataStr != null && !dataStr.isEmpty()) {
@@ -148,11 +157,68 @@ public class AgendamentoServlet extends HttpServlet {
             a.setDataHoraInicio(Timestamp.valueOf(ldt));
 
             int derivedHorarioId = deriveHorarioId(ldt, a.getTipoServicoId(), a.getClinicaId());
+
+            if (derivedHorarioId == -1) {
+                String dayName = getDayName(ldt.getDayOfWeek());
+                String hours = getWorkingHours(a.getClinicaId(), dayName);
+                String msg = "A clínica está fechada neste horário."
+                        + (hours.isEmpty() ? "" : " Horário de funcionamento: " + hours);
+
+                response.sendRedirect(
+                        "agendamentos?p=new&error=clinic_closed&msg=" + java.net.URLEncoder.encode(msg, "UTF-8"));
+                return;
+            }
+
             a.setHorarioId(derivedHorarioId);
         }
 
         AgendamentoDAO.save(a);
         response.sendRedirect("agendamentos");
+    }
+
+    private String getDayName(java.time.DayOfWeek day) {
+        switch (day) {
+            case MONDAY:
+                return "Segunda";
+            case TUESDAY:
+                return "Terca";
+            case WEDNESDAY:
+                return "Quarta";
+            case THURSDAY:
+                return "Quinta";
+            case FRIDAY:
+                return "Sexta";
+            case SATURDAY:
+                return "Sabado";
+            case SUNDAY:
+                return "Domingo";
+            default:
+                return "";
+        }
+    }
+
+    private String getWorkingHours(int clinicId, String dayName) {
+        StringBuilder sb = new StringBuilder();
+        String sql = "SELECT HoraInicio, HoraFim FROM Horario WHERE Clinica_IDClinica = ? AND DiaSemana = ? ORDER BY HoraInicio";
+        try (java.sql.Connection con = new util.Configura().getConnection();
+                java.sql.PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, clinicId);
+            ps.setString(2, dayName);
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                boolean first = true;
+                while (rs.next()) {
+                    if (!first)
+                        sb.append(", ");
+                    sb.append(rs.getTime("HoraInicio").toString().substring(0, 5))
+                            .append("-")
+                            .append(rs.getTime("HoraFim").toString().substring(0, 5));
+                    first = false;
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return sb.toString();
     }
 
     /**
@@ -162,32 +228,16 @@ public class AgendamentoServlet extends HttpServlet {
      * @param ldt       Data e hora em processamento.
      * @param serviceId Identificador do tipo de serviço.
      * @param clinicId  Identificador da clínica.
-     * @return Identificador do horário encontrado ou valor por omissão (1).
+     * @return Identificador do horário encontrado ou -1 se fechado.
      */
     private int deriveHorarioId(LocalDateTime ldt, int serviceId, int clinicId) {
-        String dayName = "";
-        switch (ldt.getDayOfWeek()) {
-            case MONDAY:
-                dayName = "Segunda";
-                break;
-            case TUESDAY:
-                dayName = "Terca";
-                break;
-            case WEDNESDAY:
-                dayName = "Quarta";
-                break;
-            case THURSDAY:
-                dayName = "Quinta";
-                break;
-            case FRIDAY:
-                dayName = "Sexta";
-                break;
-            default:
-                dayName = "Weekend";
-        }
+        String dayName = getDayName(ldt.getDayOfWeek());
+        if (dayName.isEmpty())
+            return -1;
 
         String timeStr = ldt.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
 
+        // Only select slots for the SPECIFIC CLINIC
         String sql = "SELECT IDHorario FROM Horario WHERE Clinica_IDClinica = ? AND DiaSemana = ? AND ? >= HoraInicio AND ? < HoraFim";
         try (java.sql.Connection con = new util.Configura().getConnection();
                 java.sql.PreparedStatement ps = con.prepareStatement(sql)) {
@@ -202,6 +252,6 @@ public class AgendamentoServlet extends HttpServlet {
         } catch (java.sql.SQLException e) {
             e.printStackTrace();
         }
-        return 1;
+        return -1; // Return -1 if no slot found (Clinic Closed)
     }
 }

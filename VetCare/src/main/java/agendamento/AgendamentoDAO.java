@@ -10,6 +10,8 @@ import util.Configura;
 import clinica.TipoServico;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Responsável pela persistência e gestão de agendamentos na base de dados.
@@ -44,12 +46,16 @@ public class AgendamentoDAO {
      */
     public static List<clinica.Horario> getAllHorarios() {
         List<clinica.Horario> list = new ArrayList<>();
-        String sql = "SELECT * FROM Horario ORDER BY DiaSemana, HoraInicio";
+        // Added JOIN to get Clinic Name
+        String sql = "SELECT h.*, c.Localidade FROM Horario h JOIN Clinica c ON h.Clinica_IDClinica = c.IDClinica ORDER BY c.Localidade, h.DiaSemana, h.HoraInicio";
         try (Connection con = new Configura().getConnection();
                 PreparedStatement ps = con.prepareStatement(sql);
                 ResultSet rs = ps.executeQuery()) {
-            while (rs.next())
-                list.add(new clinica.Horario(rs));
+            while (rs.next()) {
+                clinica.Horario h = new clinica.Horario(rs);
+                h.setClinicaNome(rs.getString("Localidade")); // Need to add this setter to Horario
+                list.add(h);
+            }
         } catch (SQLException e) {
             System.err.println("Erro ao listar horarios: " + e.getMessage());
         }
@@ -220,5 +226,39 @@ public class AgendamentoDAO {
             return true; // Natal
 
         return false;
+    }
+
+    /**
+     * Recupera agendamentos futuros confirmados para um animal.
+     * 
+     * @param animalId Identificador do animal.
+     * @return Lista de mapas com dados do agendamento (Data, Motivo, Serviço).
+     */
+    public static List<Map<String, Object>> getFutureAppointments(int animalId) {
+        List<Map<String, Object>> list = new ArrayList<>();
+        String sql = "SELECT a.DataHoraInicio, a.Motivo, ts.Nome as Servico " +
+                "FROM Agendamento a " +
+                "JOIN TipoServico ts ON a.TipoServico_IDServico = ts.IDServico " +
+                "WHERE a.Animal_IDAnimal = ? " +
+                "AND a.DataHoraInicio > NOW() " +
+                "AND a.Status NOT IN ('Cancelado', 'Rejeitado') " +
+                "ORDER BY a.DataHoraInicio ASC";
+
+        try (Connection con = new Configura().getConnection();
+                PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, animalId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("DataHora", rs.getTimestamp("DataHoraInicio"));
+                    map.put("Motivo", rs.getString("Motivo"));
+                    map.put("Servico", rs.getString("Servico"));
+                    list.add(map);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro ao listar agendamentos futuros: " + e.getMessage());
+        }
+        return list;
     }
 }

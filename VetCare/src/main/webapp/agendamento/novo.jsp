@@ -71,9 +71,34 @@ function filterAnimals(nif) {
                 <div style="background-color: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 10px; border-radius: 4px; margin-bottom: 20px;">
                     Erro: A clínica não funciona em fins de semana ou feriados.
                 </div>
+            <% } else if ("clinic_closed".equals(request.getParameter("error"))) { 
+                   // Safely displaying the message sent by backend implies trusting it or basic sanitization. 
+                   // For simplicity here we just display it.
+                   String msg = request.getParameter("msg");
+                   if(msg == null) msg = "A clínica está fechada neste horário.";
+            %>
+                <div style="background-color: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 10px; border-radius: 4px; margin-bottom: 20px;">
+                    Erro: <%= msg %>
+                </div>
             <% } %>
 
             <form action="agendamentos" method="post">
+                <div style="margin-bottom:15px;">
+                    <label>Clínica:</label>
+                    <select name="ClinicaID" class="form-control" required>
+                        <% 
+                        java.util.List<clinica.Clinica> clinicas = (java.util.List<clinica.Clinica>) request.getAttribute("listaClinicas");
+                        if(clinicas != null) {
+                            for(clinica.Clinica c : clinicas) {
+                        %>
+                            <option value="<%= c.getIdClinica() %>"><%= c.getLocalidade() %> (<%= c.getMoradaCompleta() %>)</option>
+                        <% 
+                            }
+                        } 
+                        %>
+                    </select>
+                </div>
+
                 <div style="margin-bottom:15px;">
                     <label>Data e Hora:</label>
                     <input type="datetime-local" name="DataHoraInicio" required class="form-control">
@@ -124,6 +149,7 @@ function filterAnimals(nif) {
                 </div>
 
                 <button type="submit" class="btn btn-primary">Agendar</button>
+                <a href="agendamentos" class="btn" style="background-color: #6c757d; color: white; text-decoration: none; margin-left: 10px;">Cancelar</a>
             </form>
         </div>
     </div>

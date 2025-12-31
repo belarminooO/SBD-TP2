@@ -84,10 +84,9 @@ public class RelatorioDAO {
                 "FROM Agendamento ag " +
                 "JOIN Cliente cl ON ag.Cliente_NIF = cl.NIF " +
                 "WHERE ag.Status = 'Cancelado' " +
-                "AND ag.DataHoraInicio >= DATE_SUB(NOW(), INTERVAL 3 MONTH) " +
                 "GROUP BY cl.NomeCompleto " +
-                "ORDER BY Qtd DESC " +
-                "LIMIT 10";
+                "ORDER BY Qtd DESC, MAX(ag.DataHoraInicio) DESC " +
+                "LIMIT 3";
 
         try (Connection con = new Configura().getConnection();
                 PreparedStatement ps = con.prepareStatement(sql);
@@ -114,6 +113,7 @@ public class RelatorioDAO {
                 "FROM Agendamento a " +
                 "JOIN TipoServico ts ON a.TipoServico_IDServico = ts.IDServico " +
                 "WHERE a.DataHoraInicio BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) " +
+                "AND a.Status NOT IN ('Cancelado', 'Rejeitado') " +
                 "GROUP BY ts.Nome";
 
         try (Connection con = new Configura().getConnection();

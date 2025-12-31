@@ -48,6 +48,33 @@
     </div>
   </div>
 
+  <% 
+     List<Map<String, Object>> futuros = (List<Map<String, Object>>) request.getAttribute("agendamentosFuturos");
+     if (futuros != null && !futuros.isEmpty()) { 
+  %>
+  <div class="card" style="margin-bottom: 20px; border-left: 5px solid #f59e0b;">
+    <h3>Agendamentos Futuros</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Data Prevista</th>
+                <th>Serviço</th>
+                <th>Motivo</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% for (Map<String, Object> ag : futuros) { %>
+            <tr>
+                <td><%= ag.get("DataHora") %></td>
+                <td><strong><%= ag.get("Servico") %></strong></td>
+                <td><%= ag.get("Motivo") != null ? ag.get("Motivo") : "-" %></td>
+            </tr>
+            <% } %>
+        </tbody>
+    </table>
+  </div>
+  <% } %>
+
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h3>Histórico Completo</h3>

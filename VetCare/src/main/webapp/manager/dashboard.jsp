@@ -54,7 +54,7 @@
         </div>
 
         <div class="card">
-            <h3>Top Cancelamentos (Último Trimestre)</h3>
+            <h3>Top 3 Clientes com Mais Cancelamentos (Total)</h3>
             <ul>
             <% List<String> cancels = (List<String>) request.getAttribute("topCancelamentos");
                if(cancels!=null) for(String s : cancels) { %>
@@ -67,7 +67,7 @@
             <h3>Exportar Perfil de Animal (XML/JSON)</h3>
             <p style="font-size: 0.9rem; color: #666;">Seleção de animal para exportação da ficha e histórico clínico completo.</p>
             <form action="manager" method="get" style="display:flex; gap:10px; align-items:flex-end;">
-                <input type="hidden" name="p" value="xml">
+
                 <div style="flex:1;">
                     <label>Animal:</label>
                     <select name="id" required style="width:100%; padding: 5px; border-radius: 4px; border: 1px solid #ddd;">

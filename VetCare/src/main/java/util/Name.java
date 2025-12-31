@@ -27,7 +27,7 @@ import java.nio.charset.StandardCharsets;
  * e o tratamento de partículas, apóstrofos e hífens.
  */
 public class Name {
-	
+
     // --- COMPONENTE DE LOGGING ---
 
     /**
@@ -190,9 +190,7 @@ public class Name {
         }
     }
 
-
     // ---LÓGICA DE PROCESSAMENTO DE NOMES---
-
 
     /**
      * Aplica correções ortográficas conhecidas a um nome.
