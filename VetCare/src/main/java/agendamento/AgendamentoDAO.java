@@ -46,14 +46,13 @@ public class AgendamentoDAO {
      */
     public static List<clinica.Horario> getAllHorarios() {
         List<clinica.Horario> list = new ArrayList<>();
-        // Added JOIN to get Clinic Name
         String sql = "SELECT h.*, c.Localidade FROM Horario h JOIN Clinica c ON h.Clinica_IDClinica = c.IDClinica ORDER BY c.Localidade, h.DiaSemana, h.HoraInicio";
         try (Connection con = new Configura().getConnection();
                 PreparedStatement ps = con.prepareStatement(sql);
                 ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 clinica.Horario h = new clinica.Horario(rs);
-                h.setClinicaNome(rs.getString("Localidade")); // Need to add this setter to Horario
+                h.setClinicaNome(rs.getString("Localidade"));
                 list.add(h);
             }
         } catch (SQLException e) {
@@ -72,6 +71,22 @@ public class AgendamentoDAO {
         if (isWeekendOrHoliday(a.getDataHoraInicio())) {
             System.err.println("Erro: Data de agendamento coincide com período de encerramento.");
             return -2;
+        }
+
+        // Validação de Sobreposição (Overlap)
+        // Assume duração padrão de 30 minutos se a DataHoraFim não estiver definida (o
+        // que é comum antes de gravar)
+        long durationMs = 30 * 60 * 1000;
+        java.sql.Timestamp startNew = a.getDataHoraInicio();
+        java.sql.Timestamp endNew = (a.getDataHoraFim() != null) ? a.getDataHoraFim()
+                : new java.sql.Timestamp(startNew.getTime() + durationMs);
+
+        if (checkAnimalOverlap(a.getAnimalId(), startNew, endNew)) {
+            return -3; // Animal overlap
+        }
+
+        if (checkServiceOverlap(a.getTipoServicoId(), a.getClinicaId(), startNew, endNew)) {
+            return -4; // Service overlap
         }
 
         String sql = "INSERT INTO Agendamento (DataHoraInicio, Motivo, Cliente_NIF, Animal_IDAnimal, IDHorario, Clinica_IDClinica, TipoServico_IDServico) VALUES (?, ?, ?, ?, ?, ?, ?)";
@@ -96,6 +111,70 @@ public class AgendamentoDAO {
             System.err.println("Erro ao criar agendamento: " + e.getMessage());
         }
         return -1;
+    }
+
+    /**
+     * Verifica se existe algum agendamento conflituoso.
+     * Regras de Colisão:
+     * 1. O mesmo Animal não pode estar em dois sítios ao mesmo tempo.
+     * 2. O mesmo Serviço (na mesma Clínica) não pode ter sobreposição (Capacidade =
+     * 1).
+     * 
+     * @param animalId      Identificador do animal.
+     * @param tipoServicoId Identificador do tipo de serviço.
+     * @param clinicaId     Identificador da clínica.
+     * @param start         Data/Hora de início.
+     * @param end           Data/Hora de fim estimada.
+     * @return true se houver conflito.
+     */
+    /**
+     * Verifica se o Animal já tem agendamento no intervalo.
+     */
+    private static boolean checkAnimalOverlap(Integer animalId, java.sql.Timestamp start, java.sql.Timestamp end) {
+        if (animalId == null)
+            return false;
+        String sql = "SELECT COUNT(*) FROM Agendamento " +
+                "WHERE Animal_IDAnimal = ? " +
+                "AND Status NOT IN ('Cancelado', 'Rejeitado') " +
+                "AND (DataHoraInicio < ? AND DataHoraFim > ?)";
+        try (Connection con = new Configura().getConnection();
+                PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, animalId);
+            ps.setTimestamp(2, end);
+            ps.setTimestamp(3, start);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next())
+                    return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro checkAnimalOverlap: " + e.getMessage());
+        }
+        return false;
+    }
+
+    /**
+     * Verifica se o Serviço já está ocupado nesta clínica no intervalo.
+     */
+    private static boolean checkServiceOverlap(Integer tipoServicoId, Integer clinicaId, java.sql.Timestamp start,
+            java.sql.Timestamp end) {
+        String sql = "SELECT COUNT(*) FROM Agendamento " +
+                "WHERE TipoServico_IDServico = ? AND Clinica_IDClinica = ? " +
+                "AND Status NOT IN ('Cancelado', 'Rejeitado') " +
+                "AND (DataHoraInicio < ? AND DataHoraFim > ?)";
+        try (Connection con = new Configura().getConnection();
+                PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, tipoServicoId);
+            ps.setInt(2, clinicaId);
+            ps.setTimestamp(3, end);
+            ps.setTimestamp(4, start);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next())
+                    return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro checkServiceOverlap: " + e.getMessage());
+        }
+        return false;
     }
 
     /**

@@ -12,10 +12,14 @@ import util.Configura;
  * Responsável por todas as operações de persistência relacionadas à entidade
  * Animal.
  * Atua como intermediário entre o modelo de objetos Java e a base de dados
- * relacional,
- * isolando a lógica de acesso a dados.
+ * relacional, isolando a lógica de acesso a dados.
  */
 public class AnimalDAO {
+    private static String lastError = "";
+
+    public static String getLastError() {
+        return lastError;
+    }
 
     /**
      * Efetua a gravação ou atualização de um registo de animal.
@@ -34,11 +38,10 @@ public class AnimalDAO {
         }
 
         String sql = "INSERT INTO Animal (Nome, Raca, Sexo, DataNascimento, Filiacao, EstadoReprodutivo, Alergias, Cores, PesoAtual, CaracteristicasDistintivas, NumeroTransponder, Fotografia, Cliente_NIF, Catalogo_NomeComum) "
-                +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection con = new Configura().getConnection();
-                PreparedStatement ps = con.prepareStatement(sql)) {
+                PreparedStatement ps = con.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setString(1, a.getNome());
             ps.setString(2, a.getRaca());
@@ -51,12 +54,19 @@ public class AnimalDAO {
             ps.setBigDecimal(9, a.getPesoAtual());
             ps.setString(10, a.getCaracteristicasDistintivas());
             ps.setString(11, a.getNumeroTransponder());
-            ps.setString(12, a.getFotografia());
+            ps.setBytes(12, a.getFotografia());
             ps.setString(13, a.getClienteNif());
             ps.setString(14, a.getCatalogoNomeComum());
 
-            return ps.executeUpdate();
+            ps.executeUpdate();
+
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
         } catch (SQLException e) {
+            lastError = e.getMessage();
             System.err.println("Erro ao gravar registo de Animal: " + e.getMessage());
         }
         return -1;
@@ -88,13 +98,14 @@ public class AnimalDAO {
             ps.setBigDecimal(9, a.getPesoAtual());
             ps.setString(10, a.getCaracteristicasDistintivas());
             ps.setString(11, a.getNumeroTransponder());
-            ps.setString(12, a.getFotografia());
+            ps.setBytes(12, a.getFotografia());
             ps.setString(13, a.getClienteNif());
             ps.setString(14, a.getCatalogoNomeComum());
             ps.setInt(15, a.getIdAnimal());
 
             return ps.executeUpdate();
         } catch (SQLException e) {
+            lastError = e.getMessage();
             System.err.println("Erro ao atualizar registo de Animal: " + e.getMessage());
         }
         return -1;

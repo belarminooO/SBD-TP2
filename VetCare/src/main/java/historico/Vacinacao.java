@@ -40,8 +40,6 @@ public class Vacinacao extends PrestacaoServico {
             this.tipoVacina = rs.getString("TipoVacina");
             this.fabricante = rs.getString("Fabricante");
         } catch (SQLException e) {
-            // Permite o funcionamento parcial em consultas que não incluam as tabelas
-            // satélite.
         }
     }
 

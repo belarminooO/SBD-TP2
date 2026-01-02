@@ -51,8 +51,8 @@ public class Animal {
     /** Código do microchip ou transponder. */
     private String numeroTransponder;
 
-    /** Caminho ou referência para a fotografia. */
-    private String fotografia;
+    /** Dados binários da fotografia (armazenados em BLOB na BD). */
+    private byte[] fotografia;
 
     /** NIF do cliente que detém a tutoria do animal. */
     private String clienteNif;
@@ -88,7 +88,7 @@ public class Animal {
         this.pesoAtual = rs.getBigDecimal("PesoAtual");
         this.caracteristicasDistintivas = rs.getString("CaracteristicasDistintivas");
         this.numeroTransponder = rs.getString("NumeroTransponder");
-        this.fotografia = rs.getString("Fotografia");
+        this.fotografia = rs.getBytes("Fotografia");
         this.clienteNif = rs.getString("Cliente_NIF");
         this.catalogoNomeComum = rs.getString("Catalogo_NomeComum");
 
@@ -122,11 +122,11 @@ public class Animal {
 
         String peso = request.getParameter("PesoAtual");
         if (peso != null && !peso.isEmpty())
-            this.pesoAtual = new BigDecimal(peso);
+            this.pesoAtual = new BigDecimal(peso.replace(",", "."));
 
         this.caracteristicasDistintivas = request.getParameter("CaracteristicasDistintivas");
         this.numeroTransponder = request.getParameter("NumeroTransponder");
-        this.fotografia = request.getParameter("Fotografia");
+        // A fotografia binária é tratada separadamente no Servlet
         this.clienteNif = request.getParameter("Cliente_NIF");
         this.catalogoNomeComum = request.getParameter("Catalogo_NomeComum");
     }
@@ -251,14 +251,25 @@ public class Animal {
         this.numeroTransponder = numeroTransponder;
     }
 
-    /** @return Referência da fotografia. */
-    public String getFotografia() {
+    /** @return Dados binários da fotografia. */
+    public byte[] getFotografia() {
         return fotografia;
     }
 
-    /** @param fotografia Define a fotografia. */
-    public void setFotografia(String fotografia) {
+    /** @param fotografia Define os dados binários da foto. */
+    public void setFotografia(byte[] fotografia) {
         this.fotografia = fotografia;
+    }
+
+    /**
+     * Retorna a fotografia convertida para Base64 para exibição em HTML.
+     * 
+     * @return String no formato "data:image/jpeg;base64,..." ou null.
+     */
+    public String getFotografiaBase64() {
+        if (fotografia == null || fotografia.length == 0)
+            return null;
+        return "data:image/jpeg;base64," + java.util.Base64.getEncoder().encodeToString(fotografia);
     }
 
     /** @return NIF do tutor. */
@@ -325,6 +336,7 @@ public class Animal {
      * @return Verdadeiro se o objeto for válido para gravação.
      */
     public boolean valid() {
-        return nome != null && !nome.isEmpty() && clienteNif != null && catalogoNomeComum != null && pesoAtual != null;
+        return nome != null && !nome.isEmpty() && clienteNif != null && catalogoNomeComum != null && pesoAtual != null
+                && estadoReprodutivo != null;
     }
 }

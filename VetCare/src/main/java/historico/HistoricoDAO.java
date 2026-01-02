@@ -124,7 +124,7 @@ public class HistoricoDAO {
                 if (con != null)
                     con.rollback();
             } catch (SQLException ex) {
-                // Erro ao reverter transação ignorado conscientemente
+
             }
             return -1;
         } finally {
@@ -159,10 +159,33 @@ public class HistoricoDAO {
                     }
                     list.add(row);
                 }
+                logDebug("HistoricoDAO.getHistoryByAnimal(" + animalId + ") View 'HistoricoClinico' returned "
+                        + list.size() + " rows.");
+            }
+
+            try (PreparedStatement psRaw = con
+                    .prepareStatement("SELECT count(*) FROM PrestacaoServico WHERE Animal_IDAnimal = ?")) {
+                psRaw.setInt(1, animalId);
+                try (ResultSet rsRaw = psRaw.executeQuery()) {
+                    if (rsRaw.next()) {
+                        logDebug("Raw count in 'PrestacaoServico' for animal " + animalId + ": " + rsRaw.getInt(1));
+                    }
+                }
             }
         } catch (SQLException e) {
             System.err.println("Erro ao ler histórico clínico: " + e.getMessage());
         }
         return list;
+    }
+
+    /**
+     * Regista mensagens de depuração na consola.
+     * Útil para rastrear a execução de operações complexas como a leitura de
+     * vistas.
+     * 
+     * @param msg Mensagem a ser registada.
+     */
+    public static void logDebug(String msg) {
+        System.out.println("[HistoricoDAO] " + msg);
     }
 }

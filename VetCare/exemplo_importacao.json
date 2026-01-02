@@ -1,0 +1,31 @@
+{
+  "info": {
+    "catalogo": "Cao",
+    "tutor_nif": "555666777",
+
+    "transponder": "888123456789002",
+    "nome": "Rex Importado",
+    "raca": "Pastor Alemão",
+    "sexo": "M",
+    "nascimento": "20/08/2021",
+    "peso": 32.5,
+    "estado_reprodutivo": "Intacto",
+
+    "filiacao": "Max e Luna",
+    "alergias": "Picada de pulga",
+    "cores": "Preto e Castanho",
+    "caracteristicas": "Muito ativo"
+  },
+  "history": [
+    {
+      "tipo": "Consulta",
+      "datahora": "2022-09-15T10:00",
+      "detalhes": "Check-up anual. Peso controlado."
+    },
+    {
+      "tipo": "Vacinação",
+      "datahora": "2023-09-15T10:15",
+      "detalhes": "Reforço anual das vacinas."
+    }
+  ]
+}

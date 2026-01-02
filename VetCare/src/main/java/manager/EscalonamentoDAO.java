@@ -16,27 +16,6 @@ import util.Configura;
 public class EscalonamentoDAO {
 
     /**
-     * Classe de transferência de dados para representação de linhas na escala.
-     */
-    public static class Escala {
-        /** Identificador do horário. */
-        public int idHorario;
-        /** Identificador do serviço. */
-        public int idServico;
-        /** Número da licença profissional do veterinário. */
-        public String nLicenca;
-        /** Dia da semana associado. */
-        public String dia;
-        /** Hora de início formatada como string. */
-        public String hora;
-        /** Nome descritivo do tipo de serviço. */
-        public String servicoNome;
-        /** Nome do médico veterinário alocado. */
-        public String vetNome;
-        public String clinica; // Added field
-    }
-
-    /**
      * Atribui um veterinário a um determinado horário e serviço clínico.
      * Realiza uma verificação prévia de sobreposições para assegurar que o
      * profissional não está alocado a turnos simultâneos.
@@ -99,8 +78,8 @@ public class EscalonamentoDAO {
             ps.setInt(2, idServico);
             ps.executeUpdate();
         } catch (SQLException e) {
-            e.printStackTrace(); // Added debug
-            // Ignora erro se não existir registo prévio para remover
+            e.printStackTrace();
+
         }
 
         String sqlIns = "INSERT INTO Escalonamento (IDHorario, IDServico, NLicenca) VALUES (?, ?, ?)";
@@ -141,7 +120,7 @@ public class EscalonamentoDAO {
                 es.nLicenca = rs.getString("NLicenca");
                 es.dia = rs.getString("DiaSemana");
                 es.hora = rs.getTime("HoraInicio").toString();
-                es.clinica = rs.getString("Localidade"); // Added field
+                es.clinica = rs.getString("Localidade");
                 es.servicoNome = rs.getString("Servico");
                 es.vetNome = rs.getString("Vet");
                 list.add(es);
@@ -170,7 +149,6 @@ public class EscalonamentoDAO {
             con = new Configura().getConnection();
             con.setAutoCommit(false);
 
-            // 1. Remover o antigo (libertar o slot para validação)
             String sqlDel = "DELETE FROM Escalonamento WHERE IDHorario=? AND IDServico=?";
             try (PreparedStatement ps = con.prepareStatement(sqlDel)) {
                 ps.setInt(1, oldHorario);
@@ -178,8 +156,6 @@ public class EscalonamentoDAO {
                 ps.executeUpdate();
             }
 
-            // 2. Verificar conflitos para o novo (Lógica replicada de atribuir)
-            // Primeiro obter detalhes do horário alvo
             String sqlTarget = "SELECT DiaSemana, HoraInicio, HoraFim FROM Horario WHERE IDHorario = ?";
             String diaTarget = "";
             java.sql.Time inicioTarget = null;
@@ -196,7 +172,6 @@ public class EscalonamentoDAO {
                 }
             }
 
-            // Verificar sobreposição
             String sqlCheck = "SELECT COUNT(*) FROM Escalonamento e " +
                     "JOIN Horario h ON e.IDHorario = h.IDHorario " +
                     "WHERE e.NLicenca = ? AND h.DiaSemana = ? " +
@@ -222,7 +197,6 @@ public class EscalonamentoDAO {
                 return -2;
             }
 
-            // 3. Inserir o novo
             String sqlIns = "INSERT INTO Escalonamento (IDHorario, IDServico, NLicenca) VALUES (?, ?, ?)";
             try (PreparedStatement ps = con.prepareStatement(sqlIns)) {
                 ps.setInt(1, newHorario);

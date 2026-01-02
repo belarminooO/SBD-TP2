@@ -30,9 +30,6 @@ import java.util.Properties;
 public class Configura {
 
 	/** Enumeração dos SGBDs suportados pela aplicação. */
-	public enum SGBD {
-		SQLServer, MySQL
-	}
 
 	/** Nome oficial da aplicação. */
 	private static final String APP_NAME = "VetCare Manager";
@@ -199,7 +196,7 @@ public class Configura {
 
 	/**
 	 * Obtém o caminho da raiz web através de um pedido direto ao servlet de
-	 * mapeamento.
+	 * mapeamento. Tenta múltiplas URLs para suportar diferentes contextos.
 	 * 
 	 * @param server Endereço do servidor onde a aplicação está alojada.
 	 * @return Caminho do sistema de ficheiros para a raiz da aplicação.
@@ -208,25 +205,38 @@ public class Configura {
 		String port = ":8080";
 		if (server.contains(":"))
 			port = "";
-		String servletURL = "http://" + server + port + "/" + APP_ABR + "/WebRootPath";
-		try {
-			URI uri = new URI(servletURL);
-			URL url = uri.toURL();
-			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-			connection.setRequestMethod("GET");
-			connection.setConnectTimeout(5000);
-			if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
-				StringBuilder response = new StringBuilder();
-				try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
-					String inputLine;
-					while ((inputLine = in.readLine()) != null)
-						response.append(inputLine);
-					return response.toString();
+
+		// Tentar múltiplas URLs (com e sem o contexto APP_ABR)
+		String[] urls = {
+				"http://" + server + port + "/" + APP_ABR + "/WebRootPath",
+				"http://" + server + port + "/WebRootPath"
+		};
+
+		for (String servletURL : urls) {
+			try {
+				URI uri = new URI(servletURL);
+				URL url = uri.toURL();
+				HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+				connection.setRequestMethod("GET");
+				connection.setConnectTimeout(2000);
+				if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
+					try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+						String path = in.readLine();
+						if (path != null && !path.trim().isEmpty()) {
+							// Garantir que termina com o separador correto
+							if (!path.endsWith(File.separator) && !path.endsWith("/")) {
+								path += File.separator;
+							}
+							return path;
+						}
+					}
 				}
+			} catch (Exception e) {
+				// Ignorar erro e tentar a próxima URL
 			}
-		} catch (Exception e) {
-			System.err.println("Erro na obtenção do caminho web real.");
 		}
+
+		System.err.println("Erro na obtenção do caminho web real após tentar múltiplas localizações.");
 		return null;
 	}
 

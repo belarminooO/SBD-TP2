@@ -27,13 +27,27 @@
     </div>
 
     <div class="container">
+        <% String msg = (String) session.getAttribute("msg");
+           if(msg != null) { session.removeAttribute("msg"); %>
+            <div class="badge" style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; display:block; width:100%; border:1px solid #c3e6cb;">
+               <%= msg %>
+            </div>
+        <% } %>
+
+        <% String msgErr = (String) session.getAttribute("msgErr");
+           if(msgErr != null) { session.removeAttribute("msgErr"); %>
+            <div class="badge" style="background:#f8d7da; color:#721c24; padding:10px; margin-bottom:15px; display:block; width:100%; border:1px solid #f5c6cb;">
+               <%= msgErr %>
+            </div>
+        <% } %>
+
         <div class="card">
             <h2>Ficha do Animal</h2>
 
             <%
             Animal a = (Animal) request.getAttribute("animal");
             %>
-            <form action="animais" method="post">
+            <form action="animais" method="post" enctype="multipart/form-data">
                 <%--  CHAVE PRIMÁRIA: Se estiver vazia, o Servlet interpreta como um 'INSERT' --%>
                 <input type="hidden" name="IDAnimal" value="<%= (a!=null && a.getIdAnimal()!=null) ? a.getIdAnimal() : "" %>">
 
@@ -45,7 +59,7 @@
                 </div>
 
                 <div style="margin-bottom:15px;">
-                    <label>Espécie: <span style="color:red;">*</span></label>
+                    <label>Nome Comum do Animal: <span style="color:red;">*</span></label>
                     <select name="Catalogo_NomeComum" required style="width:100%">
                         <%
                         List<Catalogo> especies = (List<Catalogo>) request.getAttribute("listaEspecies");
@@ -100,8 +114,12 @@
                 </div>
 
                 <div style="margin-bottom:15px;">
-                    <label>Estado Reprodutivo:</label>
-                    <input type="text" name="EstadoReprodutivo" style="width:100%" value="<%= (a!=null && a.getEstadoReprodutivo()!=null) ? a.getEstadoReprodutivo() : "" %>">
+                    <label>Estado Reprodutivo: <span style="color:red;">*</span></label>
+                    <select name="EstadoReprodutivo" required style="width:100%">
+                        <option value="Intacto" <%= (a!=null && "Intacto".equals(a.getEstadoReprodutivo())) ? "selected" : "" %>>Intacto</option>
+                        <option value="Castrado" <%= (a!=null && "Castrado".equals(a.getEstadoReprodutivo())) ? "selected" : "" %>>Castrado</option>
+                        <option value="Esterilizado" <%= (a!=null && "Esterilizado".equals(a.getEstadoReprodutivo())) ? "selected" : "" %>>Esterilizado</option>
+                    </select>
                 </div>
 
                 <div style="margin-bottom:15px;">
@@ -125,8 +143,21 @@
                 </div>
 
                 <div style="margin-bottom:15px;">
-                    <label>Fotografia (URL):</label>
-                    <input type="text" name="Fotografia" placeholder="http://..." style="width:100%" value="<%= (a!=null && a.getFotografia()!=null) ? a.getFotografia() : "" %>">
+                    <label>Fotografia:</label>
+                    <div style="display: flex; gap: 15px; align-items: center; margin-top: 5px;">
+                        <% String base64 = (a != null) ? a.getFotografiaBase64() : null;
+                           if (base64 != null) { %>
+                            <div style="text-align: center;">
+                                <img src="<%= base64 %>" 
+                                     alt="Foto atual" style="width: 100px; height: 100px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd;">
+                                <br><small>Foto atual</small>
+                            </div>
+                        <% } %>
+                        <div style="flex: 1;">
+                            <input type="file" name="fotoFicheiro" accept="image/*" style="width:100%">
+                            <p style="margin: 5px 0 0 0;"><small>Carregar nova fotografia</small></p>
+                        </div>
+                    </div>
                 </div>
 
                 <button type="submit" class="btn btn-primary">Gravar</button>

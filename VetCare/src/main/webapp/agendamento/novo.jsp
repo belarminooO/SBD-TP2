@@ -80,6 +80,14 @@ function filterAnimals(nif) {
                 <div style="background-color: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 10px; border-radius: 4px; margin-bottom: 20px;">
                     Erro: <%= msg %>
                 </div>
+            <% } else if ("overlap_animal".equals(request.getParameter("error"))) { %>
+                <div style="background-color: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 10px; border-radius: 4px; margin-bottom: 20px;">
+                    Erro: O seu animal já tem um agendamento marcado para este horário.
+                </div>
+            <% } else if ("overlap_service".equals(request.getParameter("error"))) { %>
+                <div style="background-color: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 10px; border-radius: 4px; margin-bottom: 20px;">
+                    Erro: Já foi agendado esse serviço para este horário. Por favor, selecione outro horário (considere intervalos de 30min).
+                </div>
             <% } %>
 
             <form action="agendamentos" method="post">

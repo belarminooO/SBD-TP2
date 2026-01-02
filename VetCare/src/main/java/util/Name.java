@@ -28,30 +28,10 @@ import java.nio.charset.StandardCharsets;
  */
 public class Name {
 
-    // --- COMPONENTE DE LOGGING ---
-
     /**
      * Utilitário interno para registo de mensagens (logs).
      */
-    private static final class Log {
-        public static void info(String message) {
-            if (Configura.isWebEnvironment())
-                System.out.println(message);
-        }
 
-        public static void warn(String message) {
-            if (Configura.isWebEnvironment())
-                System.err.println("AVISO: " + message);
-        }
-
-        public static void error(String message) {
-            System.err.println("ERRO: " + message);
-        }
-    }
-
-    // --- CONFIGURAÇÃO DE RECURSOS ---
-
-    /** Caminho padrao para ficheiros de recursos (ambiente de desenvolvimento). */
     private static final String CORR_FILE = "corrector.txt";
     private static final String GENERO_FILE = "gender.txt";
     private static final String FALLBACK_PATH = "src/main/webapp/WEB-INF/resources/";
@@ -79,8 +59,6 @@ public class Name {
 
     private static final Pattern SPACE_PATTERN = Pattern.compile("\\s+");
 
-    // --- MÉTODOS DE FALLBACK ---
-
     /**
      * Devolve um mapa base de correções para situações de falha no carregamento.
      */
@@ -92,22 +70,19 @@ public class Name {
                 "luis", "Luís");
     }
 
-    // Inicialização estática (tentativa de carregamento em ambiente local/IDE)
     static {
         if (!resourcesLoaded) {
             MAPA_CORR = new ConcurrentHashMap<>();
             MAPA_CORR.putAll(getHardcodedCorrecoes());
             MAPA_GENERO = new ConcurrentHashMap<>();
 
-            // Tenta carregar recursos locais se disponiveis
             resourcesLoaded = loadResources(FALLBACK_PATH + CORR_FILE, MAPA_CORR) &&
                     loadResources(FALLBACK_PATH + GENERO_FILE, MAPA_GENERO);
 
-            Log.info("Inicialização estática de Name.java concluída.");
+            if (Configura.isWebEnvironment())
+                System.out.println("Inicialização estática de Name.java concluída.");
         }
     }
-
-    // --- INICIALIZAÇÃO WEB ---
 
     /**
      * Inicializa o motor com o caminho real dos recursos no servidor.
@@ -117,13 +92,15 @@ public class Name {
      */
     public static synchronized void initialize(String path) {
         if (isInitialized) {
-            Log.warn("Name.java já se encontra inicializado.");
+            if (Configura.isWebEnvironment())
+                System.err.println("AVISO: Name.java já se encontra inicializado.");
             return;
         }
 
         if (path != null && !path.isEmpty()) {
             path = path.endsWith("/") || path.endsWith("\\") ? path : path + "/";
-            Log.info("Name.java inicializado com caminho: " + path);
+            if (Configura.isWebEnvironment())
+                System.out.println("Name.java inicializado com caminho: " + path);
 
             MAPA_CORR.clear();
             MAPA_CORR.putAll(getHardcodedCorrecoes());
@@ -152,17 +129,21 @@ public class Name {
         }
 
         Path path = Paths.get(filePath);
+        String resourceName = path.getFileName().toString();
 
         if (Files.exists(path) && Files.isReadable(path)) {
             try (BufferedReader br = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
                 readFromReader(br, targetMap);
-                Log.info("Recursos carregados: " + targetMap.size() + " itens (" + filePath + ").");
+                if (Configura.isWebEnvironment())
+                    System.out.println("Recursos carregados: " + targetMap.size() + " itens (" + filePath + ").");
             } catch (IOException e) {
-                Log.error("Falha ao ler o ficheiro '" + filePath + "': " + e.getMessage());
+                if (Configura.isWebEnvironment())
+                    System.err.println("ERRO: Falha ao ler recurso " + resourceName + ": " + e.getMessage());
                 return false;
             }
         } else {
-            Log.warn("Ficheiro de recursos não encontrado ou inacessível: " + filePath);
+            if (Configura.isWebEnvironment())
+                System.err.println("AVISO: Ficheiro de recursos não encontrado ou inacessível: " + filePath);
             return false;
         }
         return true;
@@ -189,8 +170,6 @@ public class Name {
             }
         }
     }
-
-    // ---LÓGICA DE PROCESSAMENTO DE NOMES---
 
     /**
      * Aplica correções ortográficas conhecidas a um nome.
@@ -274,7 +253,6 @@ public class Name {
             return name;
         }
 
-        // Limpeza inicial: trim, minusculas, espacos duplos, apostrofos
         String normalizedName = name.trim().toLowerCase().replaceAll("\\s+", " ");
         normalizedName = normalizedName.replaceAll("’", "'");
         String correctedName = correct(normalizedName);
@@ -297,7 +275,7 @@ public class Name {
             if (isPureConnector) {
                 processedWord = word.toLowerCase();
             } else if (hasApostrophe) {
-                // Capitalização especial para d'Almeida, O'Connor, etc.
+
                 int apostropheIndex = word.indexOf("'");
                 String prefix = word.substring(0, apostropheIndex + 1).toLowerCase();
                 String suffix = word.substring(apostropheIndex + 1);
@@ -306,10 +284,9 @@ public class Name {
                         : "";
                 processedWord = prefix + capitalizedSuffix;
             } else {
-                // Capitalização normal
+
                 processedWord = Character.toUpperCase(word.charAt(0)) + word.substring(1).toLowerCase();
 
-                // Tratamento de nomes compostos com hífen
                 if (hasHifen) {
                     processedWord = processedWord.replaceAll("-", " ");
                     processedWord = normalize(processedWord); // Recursividade simples para os componentes
@@ -413,7 +390,6 @@ public class Name {
             return name;
         }
 
-        // 1. Remover conectores intermédios (ordem inversa)
         for (int i = newWords.size() - 1; i > 0; i--) {
             String word = newWords.get(i);
             if (CONNECTORS.contains(word.toLowerCase())) {
@@ -422,7 +398,6 @@ public class Name {
             }
         }
 
-        // 2. Remover palavras intermédias inteiras
         for (int i = 1; i < newWords.size() - 1; i++) {
             String word = newWords.get(i);
             if (!CONNECTORS.contains(word.toLowerCase()) && !word.endsWith(".")) {
@@ -431,7 +406,6 @@ public class Name {
             }
         }
 
-        // 3. Remover palavras nas extremidades (último recurso)
         int lastIndex = newWords.size() - 1;
         String lastWord = newWords.get(lastIndex);
 
@@ -479,14 +453,12 @@ public class Name {
             return currentName;
         }
 
-        // Fase 1: Abreviação intermédia
         String previousName = "";
         while (currentName.length() > maxSize && !currentName.equals(previousName)) {
             previousName = currentName;
             currentName = abbreviateMiddle(currentName);
         }
 
-        // Fase 2: Remoção de segmentos abreviados
         if (currentName.length() > maxSize) {
             previousName = "";
             while (currentName.length() > maxSize && !currentName.equals(previousName)) {
@@ -494,7 +466,7 @@ public class Name {
                 currentName = stripSegment(currentName);
             }
         }
-        // Fase 3: Remoção de conectores
+
         if (currentName.length() > maxSize) {
             previousName = "";
             while (currentName.length() > maxSize && !currentName.equals(previousName)) {
@@ -507,17 +479,14 @@ public class Name {
             }
         }
 
-        // Fase 4: Abreviação do primeiro nome
         if (currentName.length() > maxSize) {
             currentName = abbreviateFirst(currentName);
         }
 
-        // Fase 5: Abreviação do último nome
         if (currentName.length() > maxSize) {
             currentName = abbreviateLast(currentName);
         }
 
-        // Fase 6: Redução drástica para iniciais
         if (currentName.length() > maxSize) {
             currentName = currentName.replaceAll("[ .]", "");
         }
@@ -530,9 +499,9 @@ public class Name {
      */
     public static void main(String[] args) {
 
-        Log.info("--- Teste Local Name.java ---");
+        if (Configura.isWebEnvironment())
+            System.out.println("--- Teste Local Name.java ---");
 
-        // Casos de teste
         String nomeOriginal = "Maria-Do-ceu Benedita Frôscolo Jovino D'Almeida MILITÃO De Sousa Baruel Dos Itaparica Boré SALVE-rainha Das abelhas";
         String nomeF = "Capitulina andrioleta da Conceicao do Corte-geral";
         String nomeM = "Joao-de-Deus acacio Techeremunga texugeiro";

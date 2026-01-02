@@ -103,11 +103,20 @@ final public class DataFormatter {
      * @return Objeto java.sql.Date ou nulo se a conversão falhar.
      */
     public static java.sql.Date StringToSqlDate(String data) {
+        if (data == null || data.isEmpty())
+            return null;
         try {
+            // Tentar formato padrão (d/M/yyyy)
             LocalDate localDate = LocalDate.parse(data, IN_FORMATTER);
             return java.sql.Date.valueOf(localDate);
-        } catch (DateTimeParseException e) {
-            System.err.println("Erro na conversão de data: " + e.getMessage());
+        } catch (DateTimeParseException e1) {
+            try {
+                // Tentar formato ISO (yyyy-MM-dd) que é o padrão dos inputs HTML5
+                LocalDate localDate = LocalDate.parse(data);
+                return java.sql.Date.valueOf(localDate);
+            } catch (DateTimeParseException e2) {
+                System.err.println("Erro na conversão de data (formato inválido: " + data + ")");
+            }
         }
         return null;
     }
@@ -525,4 +534,4 @@ final public class DataFormatter {
         }
         return original.substring(0, lastIndex) + replacement + original.substring(lastIndex + target.length());
     }
-}	
+}

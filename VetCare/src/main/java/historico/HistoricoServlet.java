@@ -103,7 +103,6 @@ public class HistoricoServlet extends HttpServlet {
         PrestacaoServico ps = null;
         int servicoId = 1;
 
-        // Instanciação baseada no tipo de serviço selecionado
         if ("Consulta".equals(tipo)) {
             Consulta c = new Consulta();
             c.setMotivo(request.getParameter("Motivo"));
@@ -151,17 +150,14 @@ public class HistoricoServlet extends HttpServlet {
             servicoId = 2;
         }
 
-        // Atribuição de dados comuns a todas as prestações de serviço
         ps.setDetalhesGerais(request.getParameter("DetalhesGerais"));
         int animalId = Integer.parseInt(request.getParameter("Animal_IDAnimal"));
         ps.setAnimalId(animalId);
         ps.setTipoServicoId(servicoId);
         ps.setDataHora(new Timestamp(System.currentTimeMillis()));
 
-        // Execução da persistência na base de dados
         HistoricoDAO.save(ps);
 
-        // Redirecionamento para evitar re-submissão de dados
         response.sendRedirect("historico?idAnimal=" + animalId);
     }
 }

@@ -96,12 +96,22 @@ public class Horario {
         this.clinicaId = clinicaId;
     }
 
-    private String clinicaNome; // Temp field for display
+    /** Nome da clínica para exibição (campo não persistido na tabela Horario). */
+    private String clinicaNome;
 
+    /**
+     * Define o nome da clínica associada a este horário.
+     * Utilizado para fins de apresentação na interface.
+     * 
+     * @param nome Nome da clínica.
+     */
     public void setClinicaNome(String nome) {
         this.clinicaNome = nome;
     }
 
+    /**
+     * @return O nome da clínica associada (se disponível).
+     */
     public String getClinicaNome() {
         return clinicaNome;
     }

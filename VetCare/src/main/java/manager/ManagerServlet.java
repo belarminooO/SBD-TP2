@@ -35,23 +35,21 @@ public class ManagerServlet extends HttpServlet {
         }
 
         if ("dashboard".equals(action)) {
-            // Carrega indicadores estatísticos e operacionais para suporte à decisão
+
             request.setAttribute("animaisVelhos", RelatorioDAO.getAnimaisExcedentes());
             request.setAttribute("tutoresObesos", RelatorioDAO.getTutoresAnimaisObesos());
             request.setAttribute("topCancelamentos", RelatorioDAO.getTutoresCancelamentos());
             request.setAttribute("agendaSemana", RelatorioDAO.getAgendaProximaSemana());
             request.getRequestDispatcher("manager/dashboard.jsp").forward(request, response);
         } else if ("horarios".equals(action)) {
-            // Prepara a visualização da escala de turnos e alocação de profissionais
+
             request.setAttribute("listaEscalas", EscalonamentoDAO.getAll());
             request.setAttribute("listaVets", veterinario.VeterinarioDAO.getAll());
             request.setAttribute("listaTipos", agendamento.AgendamentoDAO.getTiposServico());
 
-            // 1. Get All Clinics for the dropdown
             java.util.List<clinica.Clinica> todasClinicas = clinica.ClinicaDAO.getAll();
             request.setAttribute("listaClinicas", todasClinicas);
 
-            // 2. Determine Selected Clinic (Default to first one if not set)
             int selectedClinicaId = -1;
             String filterStr = request.getParameter("filterClinica");
             if (filterStr != null && !filterStr.isEmpty()) {
@@ -64,8 +62,6 @@ public class ManagerServlet extends HttpServlet {
             }
             request.setAttribute("selectedClinicaId", selectedClinicaId);
 
-            // 3. Filter Schedules for that clinic
-            // Use correct type clinica.Horario explicitly
             java.util.List<clinica.Horario> allHorarios = agendamento.AgendamentoDAO.getAllHorarios();
             java.util.List<clinica.Horario> filteredHorarios = new java.util.ArrayList<>();
 
@@ -101,9 +97,13 @@ public class ManagerServlet extends HttpServlet {
         boolean success = false;
 
         if (xmlContent != null && !xmlContent.trim().isEmpty()) {
-            success = DataTransfer.importAnimalFullProfileXml(new java.io.ByteArrayInputStream(xmlContent.getBytes()));
+            success = DataTransfer.importAnimalFullProfileXml(
+                    new java.io.ByteArrayInputStream(xmlContent.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         } else if (jsonContent != null && !jsonContent.trim().isEmpty()) {
-            success = DataTransfer.importAnimalFullProfileJson(jsonContent);
+            // Fix encoding for JSON parameter (force UTF-8)
+            String fixedJson = new String(jsonContent.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            success = DataTransfer.importAnimalFullProfileJson(fixedJson);
         }
 
         String msg = success ? "Importado com sucesso" : "Erro na importação";
@@ -159,11 +159,11 @@ public class ManagerServlet extends HttpServlet {
 
             int result = 0;
             if (oldH != null && !oldH.isEmpty() && oldS != null && !oldS.isEmpty()) {
-                // É uma atualização
+
                 result = EscalonamentoDAO.update(Integer.parseInt(oldH), Integer.parseInt(oldS), idHorario, idServico,
                         nLicenca);
             } else {
-                // É uma nova atribuição
+
                 result = EscalonamentoDAO.atribuir(idHorario, idServico, nLicenca);
             }
 

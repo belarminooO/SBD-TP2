@@ -50,11 +50,26 @@
                 </div>
             </div>
 
+            <% String msg = (String) session.getAttribute("msg");
+               if(msg != null) { session.removeAttribute("msg"); %>
+                <div class="badge" style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; display:block; width:100%; border:1px solid #c3e6cb;">
+                   <%= msg %>
+                </div>
+            <% } %>
+
+            <% String msgErr = (String) session.getAttribute("msgErr");
+               if(msgErr != null) { session.removeAttribute("msgErr"); %>
+                <div class="badge" style="background:#f8d7da; color:#721c24; padding:10px; margin-bottom:15px; display:block; width:100%; border:1px solid #f5c6cb;">
+                   <%= msgErr %>
+                </div>
+            <% } %>
+
             <table>
                 <thead>
                     <tr>
+                         <th></th>
                         <th>Nome</th>
-                        <th>Espécie</th>
+                        <th>Nome Comum</th>
                         <th>Idade / Escalão</th>
                         <th>Tutor (NIF)</th>
                         <th>Ações</th>
@@ -65,8 +80,17 @@
                     List<Animal> lista = (List<Animal>) request.getAttribute("listaAnimais");
                     if (lista != null) {
                         for (Animal a : lista) {
+                            String base64 = a.getFotografiaBase64();
                     %>
-                    <tr>
+                     <tr>
+                        <td style="width: 50px; text-align: center;">
+                            <% if (base64 != null) { %>
+                                <img src="<%= base64 %>" 
+                                     style="width: 40px; height: 40px; object-fit: cover; border-radius: 50%; border: 1px solid #ddd;">
+                            <% } else { %>
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999;">N/A</div>
+                            <% } %>
+                        </td>
                         <td><%= a.getNome() %></td>
                         <td><%= a.getCatalogoNomeComum() %></td>
                         <td>
@@ -84,7 +108,7 @@
                         }
                     } else {
                     %>
-                    <tr><td colspan="5">Sem registos.</td></tr>
+                    <tr><td colspan="6">Sem registos.</td></tr>
                     <% } %>
                 </tbody>
             </table>

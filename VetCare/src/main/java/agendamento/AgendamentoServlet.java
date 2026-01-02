@@ -136,7 +136,6 @@ public class AgendamentoServlet extends HttpServlet {
 
         a.setTipoServicoId(Integer.parseInt(request.getParameter("TipoServico")));
 
-        // Multi-clinic support: read from form, default to 1 if missing
         String clinicaIdStr = request.getParameter("ClinicaID");
         if (clinicaIdStr != null && !clinicaIdStr.isEmpty()) {
             a.setClinicaId(Integer.parseInt(clinicaIdStr));
@@ -172,31 +171,51 @@ public class AgendamentoServlet extends HttpServlet {
             a.setHorarioId(derivedHorarioId);
         }
 
-        AgendamentoDAO.save(a);
-        response.sendRedirect("agendamentos");
-    }
-
-    private String getDayName(java.time.DayOfWeek day) {
-        switch (day) {
-            case MONDAY:
-                return "Segunda";
-            case TUESDAY:
-                return "Terca";
-            case WEDNESDAY:
-                return "Quarta";
-            case THURSDAY:
-                return "Quinta";
-            case FRIDAY:
-                return "Sexta";
-            case SATURDAY:
-                return "Sabado";
-            case SUNDAY:
-                return "Domingo";
-            default:
-                return "";
+        int result = AgendamentoDAO.save(a);
+        if (result == -3) {
+            response.sendRedirect("agendamentos?p=new&error=overlap_animal");
+        } else if (result == -4) {
+            response.sendRedirect("agendamentos?p=new&error=overlap_service");
+        } else if (result == -2) {
+            response.sendRedirect("agendamentos?p=new&error=closed");
+        } else {
+            response.sendRedirect("agendamentos");
         }
     }
 
+    /**
+     * Converte o dia da semana (enum) para o nome do dia em formato string.
+     * Utilizado para mapeamento com a base de dados.
+     * 
+     * @param day Dia da semana.
+     * @return Nome do dia (Ex: "Segunda", "Terca").
+     */
+    private String getDayName(java.time.DayOfWeek day) {
+        if (day == java.time.DayOfWeek.MONDAY)
+            return "Segunda";
+        if (day == java.time.DayOfWeek.TUESDAY)
+            return "Terca";
+        if (day == java.time.DayOfWeek.WEDNESDAY)
+            return "Quarta";
+        if (day == java.time.DayOfWeek.THURSDAY)
+            return "Quinta";
+        if (day == java.time.DayOfWeek.FRIDAY)
+            return "Sexta";
+        if (day == java.time.DayOfWeek.SATURDAY)
+            return "Sabado";
+        if (day == java.time.DayOfWeek.SUNDAY)
+            return "Domingo";
+        return "";
+    }
+
+    /**
+     * Obtém as horas de funcionamento de uma clínica para um dia específico.
+     * 
+     * @param clinicId Identificador da clínica.
+     * @param dayName  Nome do dia da semana.
+     * @return String formatada com os horários de funcionamento (Ex:
+     *         "09:00-18:00").
+     */
     private String getWorkingHours(int clinicId, String dayName) {
         StringBuilder sb = new StringBuilder();
         String sql = "SELECT HoraInicio, HoraFim FROM Horario WHERE Clinica_IDClinica = ? AND DiaSemana = ? ORDER BY HoraInicio";
@@ -237,7 +256,6 @@ public class AgendamentoServlet extends HttpServlet {
 
         String timeStr = ldt.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
 
-        // Only select slots for the SPECIFIC CLINIC
         String sql = "SELECT IDHorario FROM Horario WHERE Clinica_IDClinica = ? AND DiaSemana = ? AND ? >= HoraInicio AND ? < HoraFim";
         try (java.sql.Connection con = new util.Configura().getConnection();
                 java.sql.PreparedStatement ps = con.prepareStatement(sql)) {
@@ -252,6 +270,6 @@ public class AgendamentoServlet extends HttpServlet {
         } catch (java.sql.SQLException e) {
             e.printStackTrace();
         }
-        return -1; // Return -1 if no slot found (Clinic Closed)
+        return -1;
     }
 }

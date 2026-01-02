@@ -35,9 +35,6 @@ public class Calendario {
     private static final DateTimeFormatter FORMATO_CURTO = DateTimeFormatter.ofPattern("dd/MM");
 
     /** Regiões suportadas para feriados municipais. */
-    public enum Regiao {
-        LISBOA, PORTO, BRAGA, SINTRA, EVORA
-    }
 
     /**
      * Identifica se uma determinada data corresponde a um fim de semana.
