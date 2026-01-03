@@ -37,6 +37,20 @@ public class AnimalDAO {
             return update(a);
         }
 
+        if (a.getNumeroTransponder() != null && !a.getNumeroTransponder().isEmpty()) {
+            Animal existing = getByTransponder(a.getNumeroTransponder());
+            if (existing != null) {
+
+                return -2;
+            }
+        }
+
+        Animal existing = getByNomeAndNif(a.getNome(), a.getClienteNif());
+        if (existing != null) {
+
+            return -2;
+        }
+
         String sql = "INSERT INTO Animal (Nome, Raca, Sexo, DataNascimento, Filiacao, EstadoReprodutivo, Alergias, Cores, PesoAtual, CaracteristicasDistintivas, NumeroTransponder, Fotografia, Cliente_NIF, Catalogo_NomeComum) "
                 + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -226,6 +240,32 @@ public class AnimalDAO {
             }
         } catch (SQLException e) {
             System.err.println("Erro na localização por transponder: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Localiza um animal através do par Nome + NIF do Tutor.
+     * Útil para detetar animais sem chip registados anteriormente.
+     * 
+     * @param nome Nome do animal.
+     * @param nif  NIF do tutor.
+     * @return Objeto Animal ou nulo se não for encontrado.
+     */
+    public static Animal getByNomeAndNif(String nome, String nif) {
+        String sql = "SELECT a.*, c.ExpectativaVida FROM Animal a " +
+                "JOIN Catalogo c ON a.Catalogo_NomeComum = c.NomeComum " +
+                "WHERE a.Nome = ? AND a.Cliente_NIF = ?";
+        try (Connection con = new Configura().getConnection();
+                PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, nome);
+            ps.setString(2, nif);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next())
+                    return new Animal(rs);
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro na localização por nome+NIF: " + e.getMessage());
         }
         return null;
     }

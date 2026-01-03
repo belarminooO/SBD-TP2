@@ -18,6 +18,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import org.json.JSONObject;
+import org.json.JSONArray;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
@@ -1647,101 +1649,89 @@ public final class DataTransfer {
      * @return true se a importação for bem-sucedida
      */
 
-    public static boolean importAnimalFullProfileXml(InputStream xmlStream) {
-        logDebug("Starting XML Import...");
+    /**
+     * Importa um perfil completo de animal a partir de um InputStream (XML).
+     * 
+     * @param xmlInputStream Stream contendo o XML.
+     * @return String mensagem de resultado.
+     */
+    public static String importAnimalFullProfileXml(java.io.InputStream xmlInputStream) {
         try {
-            DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
-            Document doc = dBuilder.parse(xmlStream);
-            doc.getDocumentElement().normalize();
+            javax.xml.parsers.DocumentBuilderFactory factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            javax.xml.parsers.DocumentBuilder builder = factory.newDocumentBuilder();
+            org.w3c.dom.Document doc = builder.parse(xmlInputStream);
 
-            NodeList infoList = doc.getElementsByTagName("info");
-            Element infoElem = (Element) infoList.item(0);
+            // 1. Processar Animal (dentro de <info>)
+            org.w3c.dom.Element infoEl = (org.w3c.dom.Element) doc.getElementsByTagName("info").item(0);
+            if (infoEl == null)
+                return "Erro: Estrutura XML inválida (tag <info> em falta).";
 
-            String tutorNif = getTagValue("tutor_nif", infoElem);
+            animal.Animal a = new animal.Animal();
+            a.setNome(getTagValue("nome", infoEl));
+            a.setClienteNif(getTagValue("tutor_nif", infoEl));
+            a.setNumeroTransponder(getTagValue("transponder", infoEl));
+            a.setRaca(getTagValue("raca", infoEl));
+            a.setSexo(getTagValue("sexo", infoEl));
+            a.setFiliacao(getTagValue("filiacao", infoEl));
+            a.setEstadoReprodutivo(getTagValue("estado_reprodutivo", infoEl));
+            a.setAlergias(getTagValue("alergias", infoEl));
+            a.setCores(getTagValue("cores", infoEl));
+            a.setCaracteristicasDistintivas(getTagValue("caracteristicas", infoEl));
+            a.setCatalogoNomeComum(getTagValue("catalogo", infoEl));
 
-            Cliente c = ClienteDAO.getByNif(tutorNif);
-            if (c == null) {
-                logDebug("Error: Tutor NIF " + tutorNif + " not found.");
-                return false;
+            String dataNasc = getTagValue("nascimento", infoEl);
+            if (dataNasc != null && !dataNasc.isEmpty()) {
+                // Tenta formato DD/MM/YYYY ou YYYY-MM-DD
+                try {
+                    if (dataNasc.contains("/")) {
+                        a.setDataNascimento(util.DataFormatter.StringToSqlDate(dataNasc));
+                    } else {
+                        a.setDataNascimento(java.sql.Date.valueOf(dataNasc));
+                    }
+                } catch (Exception e) {
+                }
             }
-
-            Animal a = new Animal();
-            a.setClienteNif(tutorNif);
-            a.setNome(getTagValue("nome", infoElem));
-            a.setCatalogoNomeComum(getTagValue("catalogo", infoElem));
-            a.setRaca(getTagValue("raca", infoElem));
-            a.setSexo(getTagValue("sexo", infoElem));
-            a.setNumeroTransponder(getTagValue("transponder", infoElem));
-            a.setDataNascimento(DataFormatter.StringToSqlDate(getTagValue("nascimento", infoElem)));
-
-            try {
-                String pesoStr = getTagValue("peso", infoElem);
-                if (pesoStr != null)
-                    a.setPesoAtual(new java.math.BigDecimal(pesoStr));
-                else
-                    a.setPesoAtual(java.math.BigDecimal.ZERO);
-            } catch (Exception e) {
+            String peso = getTagValue("peso", infoEl);
+            if (peso != null && !peso.isEmpty()) {
+                a.setPesoAtual(new java.math.BigDecimal(peso));
+            } else {
                 a.setPesoAtual(java.math.BigDecimal.ZERO);
             }
 
-            a.setEstadoReprodutivo(getTagValue("estado_reprodutivo", infoElem));
-            a.setFiliacao(getTagValue("filiacao", infoElem));
-            a.setAlergias(getTagValue("alergias", infoElem));
-            a.setCores(getTagValue("cores", infoElem));
-            a.setCaracteristicasDistintivas(getTagValue("caracteristicas", infoElem));
-
-            String transponder = getTagValue("transponder", infoElem);
-            Animal existing = AnimalDAO.getByTransponder(transponder);
-            if (existing != null) {
-                logDebug("Animal with transponder " + transponder + " exists. Updating (ID: " + existing.getIdAnimal()
-                        + ")...");
-                a.setIdAnimal(existing.getIdAnimal());
+            int animalId = animal.AnimalDAO.save(a);
+            if (animalId == -2) {
+                // DUPLICADO - IGNORAR
+                return "O animal " + a.getNome() + " já consta no sistema.";
             }
+            if (animalId == -1)
+                return "Erro na gravação do animal.";
 
-            int animalId;
-            if (a.getIdAnimal() != null && a.getIdAnimal() > 0) {
-                AnimalDAO.update(a);
-                animalId = a.getIdAnimal();
-                logDebug("Animal updated with ID: " + animalId);
-            } else {
-                animalId = AnimalDAO.save(a);
-                logDebug("Animal created with ID: " + animalId);
-            }
-
-            if (animalId <= 0) {
-                logDebug("Error: Failed to save/update Animal. Reason: " + AnimalDAO.getLastError());
-                return false;
-            }
-
-            NodeList historyList = doc.getElementsByTagName("record");
-            logDebug("Found history records: " + historyList.getLength());
-
+            // 2. Processar Histórico (dentro de <history>)
+            org.w3c.dom.NodeList historyList = doc.getElementsByTagName("record"); // Items are <record> inside
+                                                                                   // <history>
             for (int i = 0; i < historyList.getLength(); i++) {
-                Node recordNode = historyList.item(i);
-                if (recordNode.getNodeType() == Node.ELEMENT_NODE) {
-                    Element recordElem = (Element) recordNode;
+                org.w3c.dom.Node node = historyList.item(i);
+                if (node.getNodeType() == org.w3c.dom.Node.ELEMENT_NODE) {
+                    org.w3c.dom.Element hEl = (org.w3c.dom.Element) node;
+                    String tipo = getTagValue("tipo", hEl);
+                    String detalhes = getTagValue("detalhes", hEl);
+                    String dataHora = getTagValue("datahora", hEl);
+
                     historico.PrestacaoServico ps;
-                    String tipo = getTagValue("tipo", recordElem);
-                    if (tipo == null)
-                        tipo = "Consulta";
-                    String detalhes = getTagValue("detalhes", recordElem);
-                    if (detalhes == null)
-                        detalhes = "";
-
-                    logDebug("Processing XML record " + i + ": Type=" + tipo);
-
-                    if (tipo.equalsIgnoreCase("Cirurgia")) {
+                    if (tipo.equalsIgnoreCase("Vacinacao") || tipo.equalsIgnoreCase("Vacinação")) {
+                        historico.Vacinacao vac = new historico.Vacinacao();
+                        vac.setTipoVacina(detalhes);
+                        ps = vac;
+                    } else if (tipo.equalsIgnoreCase("TratamentoTerapeutico")) {
+                        historico.TratamentoTerapeutico tt = new historico.TratamentoTerapeutico();
+                        tt.setDescricao(detalhes);
+                        ps = tt;
+                    } else if (tipo.equalsIgnoreCase("Cirurgia")) {
                         historico.Cirurgia x = new historico.Cirurgia();
                         x.setTipoCirurgia("Geral");
                         x.setNotasPosOperatorias(detalhes);
                         ps = x;
-                    } else if (tipo.equalsIgnoreCase("Vacinacao")) {
-                        historico.Vacinacao v = new historico.Vacinacao();
-                        v.setTipoVacina(detalhes);
-                        v.setFabricante("Desconhecido");
-                        ps = v;
-                    } else if (tipo.equalsIgnoreCase("Desparasitacao")) {
+                    } else if (tipo.equalsIgnoreCase("Desparasitacao") || tipo.equalsIgnoreCase("Desparasitação")) {
                         historico.Desparasitacao d = new historico.Desparasitacao();
                         d.setTipo("Geral");
                         d.setProdutosUtilizados(detalhes);
@@ -1751,10 +1741,133 @@ public final class DataTransfer {
                         re.setTipoExame("Geral");
                         re.setResultadoDetalhado(detalhes);
                         ps = re;
+                    } else if (tipo.equalsIgnoreCase("ExameFisico")) {
+                        historico.ExameFisico ef = new historico.ExameFisico();
+                        ps = ef;
+                    } else {
+                        historico.Consulta cx = new historico.Consulta();
+                        cx.setMotivo(detalhes);
+                        cx.setSintomas("");
+                        cx.setDiagnostico("");
+                        cx.setMedicacaoPrescrita("");
+                        ps = cx;
+                    }
+
+                    ps.setAnimalId(animalId);
+                    ps.setTipoDiscriminador(tipo);
+                    ps.setDetalhesGerais(detalhes);
+                    if (dataHora != null && !dataHora.isEmpty()) {
+                        try {
+                            String safeDate = dataHora.replace("T", " ");
+                            if (safeDate.length() == 16)
+                                safeDate += ":00";
+                            ps.setDataHora(java.sql.Timestamp.valueOf(safeDate));
+                        } catch (Exception e) {
+                            ps.setDataHora(new java.sql.Timestamp(System.currentTimeMillis()));
+                        }
+                    } else {
+                        ps.setDataHora(new java.sql.Timestamp(System.currentTimeMillis()));
+                    }
+
+                    int srvId = resolveServiceId(tipo);
+                    ps.setTipoServicoId(srvId);
+                    historico.HistoricoDAO.save(ps);
+                }
+            }
+            return "Importado com sucesso.";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Erro técnico na importação XML: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Importa um perfil completo de animal a partir de uma String JSON.
+     * 
+     * @param jsonContent String contendo o JSON.
+     * @return String mensagem de resultado.
+     */
+    public static String importAnimalFullProfileJson(String jsonContent) {
+        try {
+            org.json.JSONObject root = new org.json.JSONObject(jsonContent);
+            org.json.JSONObject info = root.optJSONObject("info");
+            if (info == null)
+                return "Erro: Estrutura JSON inválida (objeto 'info' em falta).";
+
+            // 1. Processar Animal
+            animal.Animal a = new animal.Animal();
+            a.setNome(info.optString("nome"));
+            a.setClienteNif(info.optString("tutor_nif"));
+            a.setNumeroTransponder(info.optString("transponder"));
+            a.setRaca(info.optString("raca"));
+            a.setSexo(info.optString("sexo"));
+            a.setFiliacao(info.optString("filiacao"));
+            a.setEstadoReprodutivo(info.optString("estado_reprodutivo"));
+            a.setAlergias(info.optString("alergias"));
+            a.setCores(info.optString("cores"));
+            a.setCaracteristicasDistintivas(info.optString("caracteristicas"));
+            a.setCatalogoNomeComum(info.optString("catalogo"));
+
+            String dataNasc = info.optString("nascimento");
+            if (dataNasc != null && !dataNasc.isEmpty()) {
+                try {
+                    if (dataNasc.contains("/"))
+                        a.setDataNascimento(util.DataFormatter.StringToSqlDate(dataNasc));
+                    else
+                        a.setDataNascimento(java.sql.Date.valueOf(dataNasc));
+                } catch (Exception e) {
+                }
+            }
+
+            // Validar para evitar erro de BigDecimal vazio
+            double peso = info.optDouble("peso", -1.0);
+            if (peso >= 0) {
+                a.setPesoAtual(new java.math.BigDecimal(peso));
+            } else {
+                a.setPesoAtual(java.math.BigDecimal.ZERO);
+            }
+
+            int animalId = animal.AnimalDAO.save(a);
+            if (animalId == -2) {
+                // DUPLICADO - IGNORAR
+                return "O animal " + a.getNome() + " já consta no sistema.";
+            }
+            if (animalId == -1)
+                return "Erro na gravação do animal.";
+            logDebug("Animal saved (JSON) with ID: " + animalId);
+
+            // 2. Processar Histórico
+            org.json.JSONArray historyArr = root.optJSONArray("history");
+            if (historyArr != null) {
+                for (int i = 0; i < historyArr.length(); i++) {
+                    org.json.JSONObject rec = historyArr.getJSONObject(i);
+                    String tipo = rec.optString("tipo");
+                    String detalhes = rec.optString("detalhes");
+
+                    historico.PrestacaoServico ps;
+                    if (tipo.equalsIgnoreCase("Vacinacao") || tipo.equalsIgnoreCase("Vacinação")) {
+                        historico.Vacinacao vac = new historico.Vacinacao();
+                        vac.setTipoVacina(detalhes);
+                        ps = vac;
                     } else if (tipo.equalsIgnoreCase("TratamentoTerapeutico")) {
                         historico.TratamentoTerapeutico tt = new historico.TratamentoTerapeutico();
                         tt.setDescricao(detalhes);
                         ps = tt;
+                    } else if (tipo.equalsIgnoreCase("Cirurgia")) {
+                        historico.Cirurgia x = new historico.Cirurgia();
+                        x.setTipoCirurgia("Geral");
+                        x.setNotasPosOperatorias(detalhes);
+                        ps = x;
+                    } else if (tipo.equalsIgnoreCase("Desparasitacao") || tipo.equalsIgnoreCase("Desparasitação")) {
+                        historico.Desparasitacao d = new historico.Desparasitacao();
+                        d.setTipo("Geral");
+                        d.setProdutosUtilizados(detalhes);
+                        ps = d;
+                    } else if (tipo.equalsIgnoreCase("ResultadoExame")) {
+                        historico.ResultadoExame re = new historico.ResultadoExame();
+                        re.setTipoExame("Geral");
+                        re.setResultadoDetalhado(detalhes);
+                        ps = re;
                     } else if (tipo.equalsIgnoreCase("ExameFisico")) {
                         historico.ExameFisico ef = new historico.ExameFisico();
                         ps = ef;
@@ -1770,15 +1883,15 @@ public final class DataTransfer {
                     ps.setAnimalId(animalId);
                     ps.setTipoDiscriminador(tipo);
 
-                    String valDh = getTagValue("datahora", recordElem);
-                    if (valDh != null && !valDh.isEmpty()) {
+                    String dh = rec.optString("datahora");
+                    if (dh != null && !dh.isEmpty()) {
+                        String safeDate = dh.replace("T", " ");
+                        if (safeDate.length() == 16)
+                            safeDate += ":00";
                         try {
-
-                            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("d/M/yyyy HH:mm");
-                            java.util.Date parsedDate = sdf.parse(valDh);
-                            ps.setDataHora(new java.sql.Timestamp(parsedDate.getTime()));
-                        } catch (Exception e) {
-
+                            ps.setDataHora(java.sql.Timestamp.valueOf(safeDate));
+                        } catch (IllegalArgumentException ex) {
+                            logDebug("Ignorando data inválida JSON: " + safeDate);
                             ps.setDataHora(new java.sql.Timestamp(System.currentTimeMillis()));
                         }
                     } else {
@@ -1788,160 +1901,17 @@ public final class DataTransfer {
                     ps.setDetalhesGerais(detalhes);
                     int srvId = resolveServiceId(tipo);
                     ps.setTipoServicoId(srvId);
-                    logDebug("Resolved Service ID: " + srvId);
+                    logDebug("Resolved Service ID (JSON): " + srvId);
 
                     int res = HistoricoDAO.save(ps);
-                    logDebug("Save Result: " + res);
+                    logDebug("Save Result (JSON): " + res);
                 }
             }
-            return true;
-        } catch (Exception e) {
-            logDebug("Exception XML: " + e.getMessage());
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    /**
-     * Importa um perfil completo de animal a partir de JSON.
-     * 
-     * @param jsonStr cadeia JSON contendo o perfil
-     * @return true se a importação for bem-sucedida
-     */
-
-    public static boolean importAnimalFullProfileJson(String jsonStr) {
-        logDebug("Starting JSON Import...");
-        try {
-            JSONObject root = new JSONObject(jsonStr);
-            JSONObject info = root.getJSONObject("info");
-            String transponder = info.optString("transponder");
-
-            String tutorNif = info.optString("tutor_nif");
-            Cliente c = ClienteDAO.getByNif(tutorNif);
-            if (c == null) {
-                logDebug("Error: Tutor NIF " + tutorNif + " not found.");
-                return false;
-            }
-
-            Animal a = new Animal();
-            if (transponder != null && !transponder.isEmpty()) {
-                Animal existing = AnimalDAO.getByTransponder(transponder);
-                if (existing != null) {
-                    logDebug("Animal (JSON) with transponder " + transponder + " exists. Updating (ID: "
-                            + existing.getIdAnimal() + ")...");
-                    a.setIdAnimal(existing.getIdAnimal());
-                } else {
-                    a.setNumeroTransponder(transponder);
-                }
-            }
-
-            a.setNome(info.optString("nome"));
-            a.setRaca(info.optString("raca"));
-            a.setSexo(info.optString("sexo"));
-            a.setDataNascimento(DataFormatter.StringToSqlDate(info.optString("nascimento")));
-            a.setCatalogoNomeComum(info.optString("catalogo"));
-            a.setClienteNif(tutorNif);
-
-            if (info.has("peso")) {
-                a.setPesoAtual(java.math.BigDecimal.valueOf(info.optDouble("peso")));
-            } else {
-                a.setPesoAtual(java.math.BigDecimal.ZERO);
-            }
-            a.setAlergias(info.optString("alergias"));
-            a.setCores(info.optString("cores"));
-            a.setEstadoReprodutivo(info.optString("estado_reprodutivo"));
-            a.setCaracteristicasDistintivas(info.optString("caracteristicas"));
-
-            int animalId;
-            if (a.getIdAnimal() != null && a.getIdAnimal() > 0) {
-                AnimalDAO.update(a);
-                animalId = a.getIdAnimal();
-                logDebug("Animal (JSON) updated with ID: " + animalId);
-            } else {
-                animalId = AnimalDAO.save(a);
-                logDebug("Animal (JSON) created with ID: " + animalId);
-            }
-
-            if (animalId <= 0) {
-                logDebug("Error: Failed to save/update Animal (JSON). Reason: " + AnimalDAO.getLastError());
-                return false;
-            }
-
-            JSONArray history = root.getJSONArray("history");
-            logDebug("Found JSON history records: " + history.length());
-
-            for (int i = 0; i < history.length(); i++) {
-                JSONObject rec = history.getJSONObject(i);
-                historico.PrestacaoServico ps;
-                String tipo = rec.optString("tipo");
-                String detalhes = rec.optString("detalhes");
-
-                logDebug("Processing JSON record " + i + ": Type=" + tipo);
-
-                if (tipo.equalsIgnoreCase("Cirurgia")) {
-                    historico.Cirurgia x = new historico.Cirurgia();
-                    x.setTipoCirurgia("Geral");
-                    x.setNotasPosOperatorias(detalhes);
-                    ps = x;
-                } else if (tipo.equalsIgnoreCase("Vacinacao")) {
-                    historico.Vacinacao v = new historico.Vacinacao();
-                    v.setTipoVacina(detalhes);
-                    v.setFabricante("Desconhecido");
-                    ps = v;
-                } else if (tipo.equalsIgnoreCase("Desparasitacao")) {
-                    historico.Desparasitacao d = new historico.Desparasitacao();
-                    d.setTipo("Geral");
-                    d.setProdutosUtilizados(detalhes);
-                    ps = d;
-                } else if (tipo.equalsIgnoreCase("ResultadoExame")) {
-                    historico.ResultadoExame re = new historico.ResultadoExame();
-                    re.setTipoExame("Geral");
-                    re.setResultadoDetalhado(detalhes);
-                    ps = re;
-                } else if (tipo.equalsIgnoreCase("TratamentoTerapeutico")) {
-                    historico.TratamentoTerapeutico tt = new historico.TratamentoTerapeutico();
-                    tt.setDescricao(detalhes);
-                    ps = tt;
-                } else if (tipo.equalsIgnoreCase("ExameFisico")) {
-                    historico.ExameFisico ef = new historico.ExameFisico();
-                    ps = ef;
-                } else {
-                    historico.Consulta cx = new historico.Consulta();
-                    cx.setMotivo(detalhes);
-                    cx.setSintomas("");
-                    cx.setDiagnostico("");
-                    cx.setMedicacaoPrescrita("");
-                    ps = cx;
-                }
-
-                ps.setAnimalId(animalId);
-                ps.setTipoDiscriminador(tipo);
-
-                String dh = rec.optString("datahora");
-                if (dh != null && !dh.isEmpty()) {
-                    String safeDate = dh.replace("T", " ");
-                    if (safeDate.length() == 16)
-                        safeDate += ":00";
-                    try {
-                        ps.setDataHora(java.sql.Timestamp.valueOf(safeDate));
-                    } catch (IllegalArgumentException ex) {
-                        logDebug("Ignorando data inválida JSON: " + safeDate);
-                    }
-                }
-
-                ps.setDetalhesGerais(detalhes);
-                int srvId = resolveServiceId(tipo);
-                ps.setTipoServicoId(srvId);
-                logDebug("Resolved Service ID (JSON): " + srvId);
-
-                int res = HistoricoDAO.save(ps);
-                logDebug("Save Result (JSON): " + res);
-            }
-            return true;
+            return "Importado com sucesso.";
         } catch (Exception e) {
             logDebug("Exception JSON: " + e.getMessage());
             e.printStackTrace();
-            return false;
+            return "Erro técnico na importação JSON: " + e.getMessage();
         }
     }
 

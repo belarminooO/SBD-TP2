@@ -188,4 +188,5 @@ public class HistoricoDAO {
     public static void logDebug(String msg) {
         System.out.println("[HistoricoDAO] " + msg);
     }
+
 }

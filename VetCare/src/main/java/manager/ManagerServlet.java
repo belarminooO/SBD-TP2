@@ -94,19 +94,18 @@ public class ManagerServlet extends HttpServlet {
     private void processImport(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String xmlContent = request.getParameter("xmlData");
         String jsonContent = request.getParameter("jsonData");
-        boolean success = false;
+        String msg = "Erro: Nenhum conteúdo fornecido.";
 
         if (xmlContent != null && !xmlContent.trim().isEmpty()) {
-            success = DataTransfer.importAnimalFullProfileXml(
+            msg = DataTransfer.importAnimalFullProfileXml(
                     new java.io.ByteArrayInputStream(xmlContent.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         } else if (jsonContent != null && !jsonContent.trim().isEmpty()) {
             // Fix encoding for JSON parameter (force UTF-8)
             String fixedJson = new String(jsonContent.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1),
                     java.nio.charset.StandardCharsets.UTF_8);
-            success = DataTransfer.importAnimalFullProfileJson(fixedJson);
+            msg = DataTransfer.importAnimalFullProfileJson(fixedJson);
         }
 
-        String msg = success ? "Importado com sucesso" : "Erro na importação";
         response.sendRedirect("manager?msg=" + java.net.URLEncoder.encode(msg, "UTF-8"));
     }
 
@@ -145,37 +144,5 @@ public class ManagerServlet extends HttpServlet {
      * @throws ServletException Em caso de erro no processamento.
      * @throws IOException      Em caso de erro de entrada/saída.
      */
-    @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        String action = request.getParameter("action");
-        if ("atribuir".equals(action)) {
-            int idHorario = Integer.parseInt(request.getParameter("IDHorario"));
-            int idServico = Integer.parseInt(request.getParameter("IDServico"));
-            String nLicenca = request.getParameter("NLicenca");
 
-            String oldH = request.getParameter("oldIDHorario");
-            String oldS = request.getParameter("oldIDServico");
-
-            int result = 0;
-            if (oldH != null && !oldH.isEmpty() && oldS != null && !oldS.isEmpty()) {
-
-                result = EscalonamentoDAO.update(Integer.parseInt(oldH), Integer.parseInt(oldS), idHorario, idServico,
-                        nLicenca);
-            } else {
-
-                result = EscalonamentoDAO.atribuir(idHorario, idServico, nLicenca);
-            }
-
-            String msg = "";
-            if (result == 1)
-                msg = "Operação realizada com sucesso.";
-            else if (result == -2)
-                msg = "Erro: Sobreposição de horário detetada para este veterinário.";
-            else
-                msg = "Erro técnico na operação.";
-
-            response.sendRedirect("manager?p=horarios&msg=" + java.net.URLEncoder.encode(msg, "UTF-8"));
-        }
-    }
 }
