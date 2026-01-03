@@ -1,10 +1,18 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%--
-    Listagem de todos os clientes registados (Pessoas e Empresas).
-    Permite visualizar contactos e aceder à edição de dados.
---%>
 <%@ page import="java.util.List" %>
 <%@ page import="cliente.*" %>
+<%@ page import="auth.Utilizador" %>
+<%@ page import="auth.Role" %>
+<%
+    Utilizador user = (Utilizador) session.getAttribute("utilizador");
+    if (user == null) {
+        response.sendRedirect(request.getContextPath() + "/login");
+        return;
+    }
+    boolean isGerente = user.getRole() == Role.GERENTE;
+    boolean isVeterinario = user.getRole() == Role.VETERINARIO;
+    boolean podeEditar = user.podeEditarClientes();
+%>
 <!DOCTYPE html>
 <html>
 <head>
@@ -19,21 +27,34 @@
             <h1>VetCare Manager</h1>
             <nav>
                 <a href="${pageContext.request.contextPath}/" class="nav-link">Home</a>
-                <a href="${pageContext.request.contextPath}/vets" class="nav-link">Veterinários</a>
+                <% if (isGerente) { %>
+                    <a href="${pageContext.request.contextPath}/vets" class="nav-link">Veterinários</a>
+                <% } %>
                 <a href="${pageContext.request.contextPath}/clientes" class="nav-link">Clientes</a>
                 <a href="${pageContext.request.contextPath}/animais" class="nav-link">Animais</a>
                 <a href="${pageContext.request.contextPath}/agendamentos" class="nav-link">Agendamentos</a>
-                <a href="${pageContext.request.contextPath}/manager" class="nav-link">Gestão</a>
+                <% if (isGerente) { %>
+                    <a href="${pageContext.request.contextPath}/manager" class="nav-link">Gestão</a>
+                <% } %>
+                <a href="${pageContext.request. contextPath}/logout" class="nav-link" style="float: right;">Sair</a>
             </nav>
         </div>
     </div>
 
     <div class="container">
         <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <div style="display: flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                 <h2>Lista de Clientes</h2>
-                <a href="clientes?p=edit" class="btn btn-primary">+ Novo Cliente</a>
+                <% if (podeEditar) { %>
+                    <a href="clientes?p=edit" class="btn btn-primary">+ Novo Cliente</a>
+                <% } %>
             </div>
+            
+            <% if (isVeterinario) { %>
+                <div style="background:#ebf8ff; border:1px solid #4299e1; padding:10px; border-radius:5px; margin-bottom:15px;">
+                    <small>ℹ️ Modo de consulta - não é possível editar dados de clientes. </small>
+                </div>
+            <% } %>
 
             <table>
                 <thead>
@@ -44,7 +65,9 @@
                         <th>Contactos</th>
                         <th>Morada/Localidade</th>
                         <th>Preferência</th>
-                        <th>Ações</th>
+                        <% if (podeEditar) { %>
+                            <th>Ações</th>
+                        <% } %>
                     </tr>
                 </thead>
                 <tbody>
@@ -56,8 +79,8 @@
                     <tr>
                         <td><%= c.getNif() %></td>
                         <td><%= c.getNomeCompleto() %></td>
-                        <td><%= c.getTipoCliente() %></td>
-                        <td><%= (c.getContactos() != null ? c.getContactos() : "-") %></td>
+                        <td><%= c. getTipoCliente() %></td>
+                        <td><%= (c.getContactos() != null ?  c.getContactos() : "-") %></td>
                         <td>
                             <%= (c.getMorada() != null ? c.getMorada() : "") %>
                             <small style="display:block; color:#666;">
@@ -65,15 +88,17 @@
                             </small>
                         </td>
                         <td><%= (c.getPreferenciasLinguisticas() != null ? c.getPreferenciasLinguisticas() : "-") %></td>
-                        <td>
-                            <a href="clientes?p=edit&nif=<%= c.getNif() %>" class="btn btn-sm btn-primary">Editar</a>
-                        </td>
+                        <% if (podeEditar) { %>
+                            <td>
+                                <a href="clientes?p=edit&nif=<%= c.getNif() %>" class="btn btn-sm btn-primary">Editar</a>
+                            </td>
+                        <% } %>
                     </tr>
                     <%
                         }
                     } else {
                     %>
-                    <tr><td colspan="5">Sem registos.</td></tr>
+                    <tr><td colspan="<%= podeEditar ? 7 : 6 %>">Sem registos. </td></tr>
                     <% } %>
                 </tbody>
             </table>
