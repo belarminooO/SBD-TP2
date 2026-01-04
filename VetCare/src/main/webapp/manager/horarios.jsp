@@ -5,6 +5,7 @@
 --%>
 <%@ page import="java.util.*" %>
 <%@ page import="manager.EscalonamentoDAO" %>
+<%@ page import="manager.Escala" %>
 <%@ page import="clinica.*" %>
 <%@ page import="veterinario.*" %>
 <!DOCTYPE html>
@@ -177,8 +178,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                 <% List<EscalonamentoDAO.Escala> escalas = (List<EscalonamentoDAO.Escala>) request.getAttribute("listaEscalas");
-                    if(escalas!=null) for(EscalonamentoDAO.Escala e : escalas) { %>
+                 <% List<Escala> escalas = (List<Escala>) request.getAttribute("listaEscalas");
+                    if(escalas!=null) for(Escala e : escalas) { %>
                     <tr>
                         <td><strong><%= e.clinica %></strong></td>
                         <td><%= e.dia %> <%= e.hora %></td>

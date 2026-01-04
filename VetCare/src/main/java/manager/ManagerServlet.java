@@ -144,5 +144,45 @@ public class ManagerServlet extends HttpServlet {
      * @throws ServletException Em caso de erro no processamento.
      * @throws IOException      Em caso de erro de entrada/saída.
      */
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        String action = request.getParameter("action");
 
+        if ("atribuir".equals(action)) {
+            String idHorarioStr = request.getParameter("IDHorario");
+            String idServicoStr = request.getParameter("IDServico");
+            String nLicenca = request.getParameter("NLicenca");
+
+            String oldIDHorarioStr = request.getParameter("oldIDHorario");
+            String oldIDServicoStr = request.getParameter("oldIDServico");
+
+            int result;
+            if (oldIDHorarioStr != null && !oldIDHorarioStr.isEmpty() &&
+                    oldIDServicoStr != null && !oldIDServicoStr.isEmpty()) {
+
+                result = EscalonamentoDAO.update(
+                        Integer.parseInt(oldIDHorarioStr),
+                        Integer.parseInt(oldIDServicoStr),
+                        Integer.parseInt(idHorarioStr),
+                        Integer.parseInt(idServicoStr),
+                        nLicenca);
+            } else {
+                result = EscalonamentoDAO.atribuir(
+                        Integer.parseInt(idHorarioStr),
+                        Integer.parseInt(idServicoStr),
+                        nLicenca);
+            }
+
+            String msg = "Operação realizada com sucesso!";
+            if (result == -2) {
+                msg = "Aviso: Existe sobreposição de horários para este profissional.";
+            } else if (result == -1) {
+                msg = "Erro técnico ao gravar escala.";
+            }
+
+            response.sendRedirect("manager?p=horarios&msg=" + java.net.URLEncoder.encode(msg, "UTF-8")
+                    + "&filterClinica=" + request.getParameter("filterClinica"));
+        }
+    }
 }

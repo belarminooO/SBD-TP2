@@ -153,7 +153,6 @@ public class AnimalServlet extends HttpServlet {
                     System.out.println("    [DEBUG] Foto lida para binário: " + bytes.length + " bytes");
                 }
             } else {
-                // Se for edição e não enviou nova foto, manter a antiga
                 if (idStr != null) {
                     Animal ant = AnimalDAO.getById(Integer.parseInt(idStr));
                     if (ant != null)

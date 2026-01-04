@@ -5,7 +5,7 @@
         <catalogo>Gato</catalogo>
         <tutor_nif>123456789</tutor_nif>
         
-        <transponder>999123456789001</transponder>
+        <transponder></transponder>
         <nome>Mittens Importado</nome>
         <raca>Siamês</raca>
         <sexo>F</sexo>

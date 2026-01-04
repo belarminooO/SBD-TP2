@@ -47,7 +47,6 @@ public class Consulta extends PrestacaoServico {
             this.diagnostico = rs.getString("Diagnostico");
             this.medicacaoPrescrita = rs.getString("MedicacaoPrescrita");
         } catch (SQLException e) {
-            // As colunas específicas podem estar ausentes em consultas parciais.
         }
     }
 
@@ -91,4 +90,3 @@ public class Consulta extends PrestacaoServico {
         this.medicacaoPrescrita = medicacaoPrescrita;
     }
 }
-	
